@@ -12,9 +12,14 @@ import { getSettings, saveSettings } from '../storage/settingsStore'
 export function registerSettingsIpc(): void {
   ipcMain.handle(IPC.getSettings, (): Settings => getSettings())
 
-  ipcMain.handle(IPC.saveSettings, (_event, update: Partial<Settings>): Settings =>
-    saveSettings(update)
-  )
+  ipcMain.handle(IPC.saveSettings, (_event, update: Partial<Settings>): Settings => {
+    const saved = saveSettings(update)
+    // Broadcast to every window so the live screensaver reflects changes at once.
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.settingsChanged, saved)
+    }
+    return saved
+  })
 
   ipcMain.handle(IPC.selectBackgroundImage, async (event): Promise<string | null> => {
     const parent = BrowserWindow.fromWebContents(event.sender)

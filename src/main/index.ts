@@ -1,6 +1,7 @@
 import { app, globalShortcut } from 'electron'
 import { createScreensaverWindow, createSettingsWindow } from './windows'
 import { registerSettingsIpc } from './ipc/settingsIpc'
+import { registerAppIpc } from './ipc/appIpc'
 import { registerAssetProtocol, registerAssetSchemePrivileges } from './protocol/assetProtocol'
 
 // A single-instance lock keeps the screensaver from opening twice.
@@ -15,6 +16,7 @@ app.whenReady().then(() => {
   // Register handlers before any window loads so early renderer calls resolve.
   registerAssetProtocol()
   registerSettingsIpc()
+  registerAppIpc()
 
   createScreensaverWindow()
 

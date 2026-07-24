@@ -17,18 +17,24 @@ export function Background(): JSX.Element {
   useEffect(() => {
     let active = true
 
+    const apply = (backgroundImage: string): void => {
+      setSrc(backgroundImage ? toAssetUrl(backgroundImage) : defaultWallpaper)
+    }
+
     window.glass
       .getSettings()
       .then((settings) => {
-        if (!active) return
-        setSrc(settings.backgroundImage ? toAssetUrl(settings.backgroundImage) : defaultWallpaper)
+        if (active) apply(settings.backgroundImage)
       })
       .catch(() => {
         if (active) setSrc(defaultWallpaper)
       })
 
+    // Swap the wallpaper live when it is changed in the Settings window.
+    const off = window.glass.onSettingsChanged((settings) => apply(settings.backgroundImage))
     return () => {
       active = false
+      off()
     }
   }, [])
 

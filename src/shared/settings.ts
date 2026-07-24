@@ -26,5 +26,9 @@ export const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
 export const IPC = {
   getSettings: 'settings:get',
   saveSettings: 'settings:save',
-  selectBackgroundImage: 'settings:select-image'
+  selectBackgroundImage: 'settings:select-image',
+  /** Main → renderer broadcast when settings change, for live updates. */
+  settingsChanged: 'settings:changed',
+  /** Renderer → main request to quit the whole app. */
+  quit: 'app:quit'
 } as const

@@ -18,8 +18,19 @@ npm run dev
 
 `npm run dev` launches the fullscreen screensaver window.
 
-- `Ctrl/Cmd + ,` opens Settings
+The first `npm install` downloads the Electron binary, so it can take a few
+minutes. (If this project lives in a cloud-synced folder such as OneDrive,
+consider excluding `node_modules` from syncing.)
+
+## Using it
+
+- `Ctrl/Cmd + ,` opens the Settings window
 - `Ctrl/Cmd + Q` quits
+
+In Settings you can choose a background image (jpg, jpeg, png, webp), toggle
+12/24-hour time, toggle seconds, and exit. Changes are saved immediately and
+the screensaver updates live. Settings persist in a `settings.json` file inside
+Electron's per-user `userData` directory.
 
 ## Scripts
 
@@ -35,13 +46,25 @@ npm run dev
 
 ```
 src/
-  shared/      Types and IPC channel names shared across processes
-  main/        Electron main process (windows, lifecycle)
+  shared/      Types, defaults, IPC channel names, protocol name
+  main/        Electron main process
+    storage/   JSON settings persistence (the only filesystem access)
+    ipc/       IPC handlers (settings, app)
+    protocol/  Custom scheme that safely serves on-disk images
   preload/     Secure contextBridge API exposed to the renderer
-  renderer/    React UI (screensaver + settings windows)
+  renderer/    React UI
+    components/ Background, GlassCard, Clock, DateCard
+    settings/   Settings window UI
+    screensaver/App composition for the screensaver window
 ```
+
+## Distribution
+
+`npm run dist` uses electron-builder to produce an installer in `dist/`
+(dmg on macOS, NSIS on Windows, AppImage on Linux). Build on the target OS for
+that platform's package.
 
 ## Status
 
-Scaffold and Electron/Vite setup complete. Storage, the glass UI, and the
-settings form are added in subsequent steps.
+Feature-complete for v1: fullscreen screensaver, custom/default background,
+liquid-glass clock and date, and a Settings window with live updates.

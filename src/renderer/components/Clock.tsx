@@ -40,8 +40,12 @@ export function Clock(): JSX.Element {
       .catch(() => {
         /* keep defaults */
       })
+
+    // Reflect changes made in the Settings window without a relaunch.
+    const off = window.glass.onSettingsChanged(setSettings)
     return () => {
       active = false
+      off()
     }
   }, [])
 
