@@ -1,0 +1,72 @@
+.glass-card {
+  /* Tunable surface tokens — override per-instance via inline style if needed. */
+  --glass-radius: clamp(24px, 3.6vmin, 44px);
+  --glass-padding: clamp(18px, 3vmin, 40px);
+  --glass-fill-top: rgba(255, 255, 255, 0.14);
+  --glass-fill-bottom: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-blur: 26px;
+
+  position: relative;
+  display: inline-flex;
+  border-radius: var(--glass-radius);
+
+  /* Semi-transparent white fill with a soft top-to-bottom sheen. */
+  background-image: linear-gradient(
+    160deg,
+    var(--glass-fill-top),
+    var(--glass-fill-bottom)
+  );
+
+  /* Frosted blur; saturate lifts the colours showing through the glass. */
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+
+  /* Thin, subtle border. */
+  border: 1px solid var(--glass-border);
+
+  /* Soft drop shadow for lift, plus inset highlights/shade for a glass edge. */
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.18),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.12);
+
+  /* Keep the blur and sheen clipped to the rounded shape. */
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.glass-card__content {
+  position: relative;
+  z-index: 1;
+  padding: var(--glass-padding);
+  width: 100%;
+}
+
+/* A faint diagonal glint across the top edge — the "liquid glass" highlight. */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0) 42%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gracefully degrade where backdrop-filter is unavailable: lean on a more
+   opaque fill so the card stays legible instead of near-transparent. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-card {
+    background-image: linear-gradient(
+      160deg,
+      rgba(40, 44, 52, 0.72),
+      rgba(24, 26, 32, 0.72)
+    );
+  }
+}

@@ -17,3 +17,12 @@ body {
   position: fixed;
   inset: 0;
 }
+
+/* Sits above the fixed wallpaper so the glass frosts the image behind it. */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+}
