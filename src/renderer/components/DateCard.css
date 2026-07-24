@@ -1,7 +1,7 @@
 .date-card {
-  /* A slimmer, pill-like surface to sit under the clock. */
-  --glass-radius: clamp(16px, 2.4vmin, 30px);
-  --glass-padding: clamp(9px, 1.5vmin, 18px) clamp(20px, 3.4vmin, 46px);
+  /* A slimmer, pill-like surface to sit under the clock — ~20% smaller. */
+  --glass-radius: clamp(13px, 1.9vmin, 24px);
+  --glass-padding: clamp(7px, 1.2vmin, 14px) clamp(16px, 2.7vmin, 37px);
 }
 
 .date {
@@ -15,8 +15,8 @@
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: clamp(14px, 2.3vmin, 30px);
+  font-size: clamp(11px, 1.85vmin, 24px);
 
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.28);
 }

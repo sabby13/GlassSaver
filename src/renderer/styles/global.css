@@ -27,10 +27,21 @@ body {
   place-items: center;
 }
 
-/* Vertical stack: clock above, date below. */
+/* Vertical stack: clock above, date below. Nudged up so the composition
+   sits a little above centre, giving the wallpaper more room to breathe. */
 .time-stack {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(16px, 2.6vmin, 40px);
+  gap: clamp(8px, 1.3vmin, 18px);
+  transform: translateY(-50px);
+}
+
+/* Offscreen SVG filter definitions — never painted directly. */
+.glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }

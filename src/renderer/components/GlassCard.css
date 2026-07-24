@@ -2,10 +2,11 @@
   /* Tunable surface tokens — override per-instance via inline style if needed. */
   --glass-radius: clamp(24px, 3.6vmin, 44px);
   --glass-padding: clamp(18px, 3vmin, 40px);
-  --glass-fill-top: rgba(255, 255, 255, 0.14);
-  --glass-fill-bottom: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.45);
-  --glass-blur: 26px;
+  /* Lighter fill (~30% less opaque) so the wallpaper stays the hero. */
+  --glass-fill-top: rgba(255, 255, 255, 0.060);
+  --glass-fill-bottom: rgba(255, 255, 255, 0.015);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-blur: 8px;
 
   position: relative;
   display: inline-flex;
@@ -18,19 +19,20 @@
     var(--glass-fill-bottom)
   );
 
-  /* Frosted blur; saturate lifts the colours showing through the glass. */
-  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  /* Deeper frost plus an extremely subtle refraction of the backdrop.
+     The SVG filter is defined once in the screensaver window; if it is ever
+     unavailable the blur/saturate still apply on their own. */
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%) url(#glass-refract);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
 
-  /* Thin, subtle border. */
+  /* Barely-there border. */
   border: 1px solid var(--glass-border);
 
-  /* Soft drop shadow for lift, plus inset highlights/shade for a glass edge. */
+  /* Soft, diffuse shadow and a whisper of an inner highlight. */
   box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.35),
-    0 2px 8px rgba(0, 0, 0, 0.18),
-    inset 0 1px 1px rgba(255, 255, 255, 0.45),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.12);
+    0 30px 80px rgba(0, 0, 0, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
 
   /* Keep the blur and sheen clipped to the rounded shape. */
   overflow: hidden;
@@ -52,8 +54,8 @@
   border-radius: inherit;
   background: linear-gradient(
     140deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0) 42%
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0) 40%
   );
   pointer-events: none;
   z-index: 0;
@@ -65,8 +67,8 @@
   .glass-card {
     background-image: linear-gradient(
       160deg,
-      rgba(40, 44, 52, 0.72),
-      rgba(24, 26, 32, 0.72)
+      rgba(40, 44, 52, 0.6),
+      rgba(24, 26, 32, 0.6)
     );
   }
 }

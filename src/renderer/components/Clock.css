@@ -7,27 +7,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(8px, 1.4vmin, 22px);
+  gap: clamp(10px, 1.7vmin, 26px);
   line-height: 1;
   user-select: none;
   font-family: 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
 }
 
 .clock__segment {
   display: inline-block;
-  min-width: 1.25em;
+  min-width: 1.28em;
   text-align: center;
   font-size: clamp(64px, 15vmin, 190px);
 
-  /* Hollow, glassy numerals: near-transparent fill with a crisp light outline. */
-  color: rgba(255, 255, 255, 0.08);
-  -webkit-text-stroke: clamp(1.5px, 0.35vmin, 3px) rgba(255, 255, 255, 0.92);
+  /* A touch more room between the two digits of each unit. */
+  letter-spacing: 0.05em;
+
+  /* Hollow, glassy numerals: near-transparent fill with a fine light outline. */
+  color: rgba(255, 255, 255, 0.06);
+  -webkit-text-stroke: clamp(1.1px, 0.26vmin, 2.2px) rgba(255, 255, 255, 0.9);
 
   /* Soft glow keeps the outline readable over bright wallpapers. */
-  text-shadow: 0 4px 26px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 3px 22px rgba(0, 0, 0, 0.24);
 }
 
 .clock__separator {
