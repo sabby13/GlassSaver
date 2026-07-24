@@ -26,3 +26,11 @@ body {
   display: grid;
   place-items: center;
 }
+
+/* Vertical stack: clock above, date below. */
+.time-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 2.6vmin, 40px);
+}
