@@ -16,6 +16,7 @@ export interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
 export function GlassCard({ children, className, ...rest }: GlassCardProps): JSX.Element {
   return (
     <div className={className ? `glass-card ${className}` : 'glass-card'} {...rest}>
+      <span className="glass-card__refraction" aria-hidden="true" />
       <div className="glass-card__content">{children}</div>
     </div>
   )

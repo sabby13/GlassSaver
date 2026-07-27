@@ -8,6 +8,9 @@
   --glass-border: rgba(255, 255, 255, 0.28);
   --glass-glow: rgba(255, 255, 255, 0.12);
   --glass-blur: 8px;
+  /* Strength and pace of the drifting prismatic reflection. */
+  --glass-refraction-opacity: 0.55;
+  --glass-refraction-speed: 28s;
 
   position: relative;
   display: inline-flex;
@@ -87,6 +90,74 @@
   mask-composite: exclude;
   pointer-events: none;
   z-index: 0;
+}
+
+/* A slow-drifting prismatic reflection, like light bending through real glass.
+   A soft rainbow streak, blended as light and clipped to the card shape, that
+   sweeps gently across on a long loop. Only transform animates (compositor-
+   cheap); it is disabled entirely for reduced-motion users. */
+.glass-card__refraction {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--glass-refraction-opacity);
+  mix-blend-mode: screen;
+
+  /* Soft rainbow blobs spread across the whole card, so the surface is always
+     lit somewhere and the reflection can never slide off the glass. */
+  background-repeat: no-repeat;
+  background-size: 135% 135%;
+  background-image:
+    radial-gradient(60% 80% at 22% 30%, rgba(255, 140, 150, 0.12), transparent 66%),
+    radial-gradient(70% 70% at 72% 38%, rgba(130, 200, 255, 0.13), transparent 68%),
+    radial-gradient(66% 76% at 48% 74%, rgba(170, 140, 255, 0.12), transparent 66%),
+    radial-gradient(56% 62% at 84% 68%, rgba(150, 255, 180, 0.10), transparent 66%);
+  filter: blur(22px);
+  will-change: filter, background-position;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .glass-card__refraction {
+    animation: glass-refraction var(--glass-refraction-speed) linear infinite;
+  }
+}
+
+/* One continuous, seamless motion: the colours flow through the spectrum
+   (hue 0 -> 360 wraps invisibly) while the whole field gently orbits a small
+   circle. No reversal, no reset — a slow, wave-like drift that stays inside
+   the card. Only three keyframes carry the filter so hue interpolates evenly. */
+@keyframes glass-refraction {
+  0% {
+    background-position: 57% 45%;
+    filter: blur(22px) hue-rotate(0deg);
+  }
+  12.5% {
+    background-position: 53% 53%;
+  }
+  25% {
+    background-position: 45% 57%;
+  }
+  37.5% {
+    background-position: 37% 53%;
+  }
+  50% {
+    background-position: 33% 45%;
+    filter: blur(22px) hue-rotate(180deg);
+  }
+  62.5% {
+    background-position: 37% 37%;
+  }
+  75% {
+    background-position: 45% 33%;
+  }
+  87.5% {
+    background-position: 53% 37%;
+  }
+  100% {
+    background-position: 57% 45%;
+    filter: blur(22px) hue-rotate(360deg);
+  }
 }
 
 /* Gracefully degrade where backdrop-filter is unavailable: lean on a more

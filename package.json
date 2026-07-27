@@ -30,6 +30,7 @@
   "build": {
     "appId": "com.sahib.glasssaver",
     "productName": "GlassSaver",
+    "compression": "maximum",
     "files": [
       "out/**/*"
     ],
