@@ -9,8 +9,8 @@
   --glass-glow: rgba(255, 255, 255, 0.12);
   --glass-blur: 8px;
   /* Strength and pace of the drifting prismatic reflection. */
-  --glass-refraction-opacity: 0.9;
-  --glass-refraction-speed: 24s;
+  --glass-refraction-opacity: 0.55;
+  --glass-refraction-speed: 34s;
 
   position: relative;
   display: inline-flex;
@@ -107,14 +107,14 @@
   /* Saturated rainbow blobs spread across the whole card, so the surface is
      always lit somewhere and the reflection can never slide off the glass. */
   background-repeat: no-repeat;
-  background-size: 165% 165%;
+  background-size: 155% 155%;
   background-image:
-    radial-gradient(55% 70% at 22% 30%, rgba(255, 80, 120, 0.5), transparent 60%),
-    radial-gradient(60% 65% at 70% 38%, rgba(80, 180, 255, 0.55), transparent 62%),
-    radial-gradient(60% 72% at 46% 72%, rgba(170, 110, 255, 0.5), transparent 60%),
-    radial-gradient(55% 60% at 84% 66%, rgba(100, 255, 170, 0.44), transparent 60%),
-    radial-gradient(50% 58% at 14% 70%, rgba(255, 200, 80, 0.42), transparent 60%);
-  filter: blur(16px);
+    radial-gradient(55% 70% at 22% 30%, rgba(255, 120, 150, 0.28), transparent 62%),
+    radial-gradient(60% 65% at 70% 38%, rgba(120, 195, 255, 0.30), transparent 64%),
+    radial-gradient(60% 72% at 46% 72%, rgba(185, 140, 255, 0.28), transparent 62%),
+    radial-gradient(55% 60% at 84% 66%, rgba(140, 255, 190, 0.24), transparent 62%),
+    radial-gradient(50% 58% at 14% 70%, rgba(255, 215, 130, 0.22), transparent 62%);
+  filter: blur(19px);
   will-change: filter, background-position;
 }
 
@@ -130,34 +130,34 @@
    the card. Only three keyframes carry the filter so hue interpolates evenly. */
 @keyframes glass-refraction {
   0% {
-    background-position: 72% 50%;
-    filter: blur(16px) hue-rotate(0deg);
+    background-position: 64% 50%;
+    filter: blur(19px) hue-rotate(0deg);
   }
   12.5% {
-    background-position: 66% 66%;
+    background-position: 60% 60%;
   }
   25% {
-    background-position: 50% 72%;
+    background-position: 50% 64%;
   }
   37.5% {
-    background-position: 34% 66%;
+    background-position: 40% 60%;
   }
   50% {
-    background-position: 28% 50%;
-    filter: blur(16px) hue-rotate(180deg);
+    background-position: 36% 50%;
+    filter: blur(19px) hue-rotate(180deg);
   }
   62.5% {
-    background-position: 34% 34%;
+    background-position: 40% 40%;
   }
   75% {
-    background-position: 50% 28%;
+    background-position: 50% 36%;
   }
   87.5% {
-    background-position: 66% 34%;
+    background-position: 60% 40%;
   }
   100% {
-    background-position: 72% 50%;
-    filter: blur(16px) hue-rotate(360deg);
+    background-position: 64% 50%;
+    filter: blur(19px) hue-rotate(360deg);
   }
 }
 
