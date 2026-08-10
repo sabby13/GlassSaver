@@ -2,12 +2,13 @@
  * Central, tunable configuration for the butterfly system. Every visual and
  * behavioural constant lives here so the feel can be dialled in without
  * touching the simulation code. World units are metres; the camera sits at
- * z = +CAMERA_DISTANCE looking toward -z.
+ * z = +cameraDistance looking toward -z.
  */
 export interface ButterflyConfig {
   enabled: boolean
 
-  /** Normalised world size (largest model dimension, in metres) after rescaling. */
+  /** Base normalised world size (largest model dimension, metres). Depth makes
+   *  the apparent size vary around this via perspective. */
   scale: number
   /** Overall material opacity ceiling (atmospheric fade multiplies under this). */
   opacity: number
@@ -25,9 +26,11 @@ export interface ButterflyConfig {
   // --- Flight ---
   minSpeed: number
   maxSpeed: number
-  /** How hard the heading eases toward the target direction (per second). */
+  /** How quickly velocity eases toward its target — lower = more momentum/inertia. */
   turnStrength: number
-  /** Strength of the slow secondary drift/bob. */
+  /** Subtle speed increase when close to the camera (0 = none). */
+  depthSpeedBoost: number
+  /** Strength of the slow secondary drift. */
   driftStrength: number
   verticalDrift: number
   /** Max bank (roll) into a turn, radians. */
@@ -38,63 +41,77 @@ export interface ButterflyConfig {
   glideProbability: number
 
   // --- Clock keep-out (screen centre) ---
-  /** Half-size of the region around the view axis the butterfly avoids dwelling in. */
   keepoutX: number
   keepoutY: number
+  /** Depth band around the clock plane where avoidance is strongest. */
   keepoutZ: number
+
+  // --- Lifecycle ---
+  /** Seconds of roaming before it wanders off-screen (min/max). */
+  roamDurationMin: number
+  roamDurationMax: number
+  /** Seconds it stays gone before returning from a new direction (min/max). */
+  offscreenDelayMin: number
+  offscreenDelayMax: number
 
   // --- Wings ---
   /** Base wing-beat playback rate (multiplier on the baked clip). */
   wingSpeed: number
+  /** How much the wing stroke opens/relaxes during glides (0..1). */
+  wingAmplitude: number
   /** Index of the baked clip to use as the wing beat. */
   wingClipIndex: number
 
   // --- Orientation ---
-  /**
-   * Euler offset (radians) applied to the model so its authored forward axis
-   * aligns with the flight forward (-z). Exposed because the GLB's forward
-   * axis can only be confirmed visually.
-   */
+  /** Euler offset (radians) aligning the model's authored forward with -z. */
   modelOrientationOffset: [number, number, number]
 
   // --- Rendering ---
-  /** Tone-mapping exposure; kept below 1 so the butterfly never outshines the scene. */
   exposure: number
-  /** Cap on device pixel ratio to bound GPU cost on hi-dpi displays. */
+  /** Environment-map reflection strength on the butterfly (grounds it in the scene). */
+  envIntensity: number
   maxPixelRatio: number
 }
 
 export const butterflyConfig: ButterflyConfig = {
   enabled: true,
 
-  scale: 0.9,
-  opacity: 0.96,
+  scale: 1.35,
+  opacity: 0.97,
 
   cameraDistance: 6,
   fov: 35,
   boundsX: 4.2,
-  boundsY: 2.4,
-  minDepth: -6,
-  maxDepth: 1.2,
+  boundsY: 2.5,
+  minDepth: -5.5,
+  maxDepth: 1.0,
 
   minSpeed: 0.35,
   maxSpeed: 1.5,
-  turnStrength: 1.1,
+  turnStrength: 1.3,
+  depthSpeedBoost: 0.35,
   driftStrength: 0.5,
   verticalDrift: 0.22,
   bankAmount: 0.6,
-  pitchAmount: 0.28,
-  glideProbability: 0.12,
+  pitchAmount: 0.3,
+  glideProbability: 0.14,
 
   keepoutX: 1.7,
   keepoutY: 1.1,
-  keepoutZ: 2.2,
+  keepoutZ: 2.0,
+
+  roamDurationMin: 14,
+  roamDurationMax: 26,
+  offscreenDelayMin: 3,
+  offscreenDelayMax: 8,
 
   wingSpeed: 1.0,
+  wingAmplitude: 0.35,
   wingClipIndex: 0,
 
   modelOrientationOffset: [0, 0, 0],
 
-  exposure: 0.85,
+  exposure: 0.95,
+  envIntensity: 0.35,
   maxPixelRatio: 2
 }

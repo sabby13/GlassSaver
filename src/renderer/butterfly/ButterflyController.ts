@@ -8,6 +8,7 @@ import {
   HemisphereLight,
   Mesh,
   PerspectiveCamera,
+  PMREMGenerator,
   Quaternion,
   Scene,
   SRGBColorSpace,
@@ -16,6 +17,7 @@ import {
 } from 'three'
 import type { Material, Object3D, Texture } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { butterflyConfig, type ButterflyConfig } from './config'
 import { FlightModel } from './FlightModel'
 import { WingController } from './WingController'
@@ -39,6 +41,7 @@ export class ButterflyController {
 
   private pivot: Group | null = null
   private wings: WingController | null = null
+  private envTexture: Texture | null = null
   private readonly materials: Material[] = []
 
   // Reused each frame — no per-frame allocation.
@@ -81,6 +84,14 @@ export class ButterflyController {
     const ambient = new AmbientLight(0xffffff, 0.25)
     this.scene.add(hemi, key, ambient)
 
+    // A neutral environment map (generated once) gives the PBR materials soft
+    // realistic reflections so the butterfly reads as part of the scene rather
+    // than a flat cut-out. One-time cost — not a per-frame post-process.
+    const pmrem = new PMREMGenerator(this.renderer)
+    this.envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    this.scene.environment = this.envTexture
+    pmrem.dispose()
+
     this.resize()
     window.addEventListener('resize', this.resize)
     document.addEventListener('visibilitychange', this.onVisibility)
@@ -118,7 +129,7 @@ export class ButterflyController {
         m.transparent = true
         m.opacity = 0
         const std = m as Material & { envMapIntensity?: number }
-        if (typeof std.envMapIntensity === 'number') std.envMapIntensity = 0.6
+        if (typeof std.envMapIntensity === 'number') std.envMapIntensity = this.cfg.envIntensity
         this.materials.push(m)
       }
     })
@@ -171,7 +182,7 @@ export class ButterflyController {
 
       // Opacity: entrance/exit presence × subtle atmospheric fade with depth.
       const depthT = clamp01((this.flight.position.z - this.cfg.minDepth) / (0 - this.cfg.minDepth))
-      const depthFade = 0.55 + 0.45 * depthT
+      const depthFade = 0.45 + 0.55 * depthT
       const opacity = this.cfg.opacity * this.flight.presence * depthFade
       for (const m of this.materials) m.opacity = opacity
 
@@ -206,6 +217,7 @@ export class ButterflyController {
     document.removeEventListener('visibilitychange', this.onVisibility)
 
     this.wings?.dispose()
+    this.envTexture?.dispose()
     this.scene.traverse((obj: Object3D) => {
       const mesh = obj as Mesh
       if (mesh.isMesh) {

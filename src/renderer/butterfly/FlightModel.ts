@@ -1,18 +1,20 @@
 import { Vector3 } from 'three'
 import type { ButterflyConfig } from './config'
 
+const UP = new Vector3(0, 1, 0)
 const randRange = (a: number, b: number): number => a + Math.random() * (b - a)
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 /** Frame-rate independent smoothing factor for an exponential approach. */
 const smooth = (rate: number, dt: number): number => 1 - Math.exp(-rate * dt)
 
-type Phase = 'entering' | 'roaming' | 'leaving'
+type Phase = 'entering' | 'roaming' | 'leaving' | 'gone'
 
 /**
- * A small steering-based flight simulation. It produces an organic wandering
- * path: a smooth primary trajectory toward slowly-changing targets, secondary
- * drift/bob, and tertiary noise — plus banking, pitch, glides, clock keep-out,
- * and an entrance/exit "presence" so the butterfly can drift out of frame and
- * return. No allocation happens in update(); temp vectors are reused.
+ * Steering-based flight with momentum. Velocity eases toward a desired velocity
+ * (so heading and speed both have inertia), the desired direction is gently
+ * curved by a wander angle, targets are spread across screen regions, and the
+ * butterfly periodically leaves the frame entirely and returns later from a new
+ * direction/depth. No allocation happens in update(); temp vectors are reused.
  */
 export class FlightModel {
   readonly position = new Vector3()
@@ -23,22 +25,25 @@ export class FlightModel {
   speed = 0
   roll = 0
   pitch = 0
-  /** 0..1 fade used for the entrance, exit, and "off in the wider world" states. */
+  /** 0..1 fade for entrance, exit, and the "off in the wider world" states. */
   presence = 0
 
   private readonly cfg: ButterflyConfig
+  private readonly velocity = new Vector3()
   private readonly target = new Vector3()
   private readonly desired = new Vector3()
   private readonly tmp = new Vector3()
   private readonly prevForward = new Vector3(0, 0, -1)
 
-  private targetSpeed = 0
+  private phase: Phase = 'entering'
   private retarget = 0
+  private roamTimer = 0
+  private goneTimer = 0
   private gliding = false
   private glideTimer = 0
-  private phase: Phase = 'entering'
-  private phaseTimer = 0
-  private driftSeed = Math.random() * 1000
+  private wanderAngle = Math.random() * Math.PI * 2
+  private region = Math.floor(Math.random() * 5)
+  private readonly seed = Math.random() * 1000
   private time = 0
 
   constructor(config: ButterflyConfig) {
@@ -46,36 +51,53 @@ export class FlightModel {
     this.spawn()
   }
 
-  /** Place the butterfly at a distant, off-centre point and begin entering. */
+  /** Enter from a distant, off-centre point, from a fresh side and depth. */
   spawn(): void {
     const c = this.cfg
     const side = Math.random() < 0.5 ? -1 : 1
     this.position.set(
-      side * randRange(c.boundsX * 0.7, c.boundsX * 1.15),
-      randRange(-c.boundsY * 0.5, c.boundsY * 0.8),
-      randRange(c.minDepth, c.minDepth * 0.55)
+      side * randRange(c.boundsX * 0.8, c.boundsX * 1.2),
+      randRange(-c.boundsY * 0.6, c.boundsY * 0.9),
+      randRange(c.minDepth, c.minDepth * 0.5)
     )
-    this.forward.set(-side, 0, 0.15).normalize()
+    this.forward.set(-side, 0, 0.2).normalize()
+    this.velocity.copy(this.forward).multiplyScalar(c.minSpeed)
     this.prevForward.copy(this.forward)
     this.speed = c.minSpeed
-    this.targetSpeed = c.minSpeed
     this.presence = 0
     this.phase = 'entering'
-    this.phaseTimer = 0
     this.pickTarget(true)
     this.visualPosition.copy(this.position)
   }
 
   private pickTarget(inward: boolean): void {
     const c = this.cfg
-    let x = randRange(-c.boundsX, c.boundsX)
-    let y = randRange(-c.boundsY, c.boundsY)
-    const z = randRange(c.minDepth, c.maxDepth)
-    // Bias away from the screen centre so it doesn't settle over the clock.
-    if (Math.abs(x) < c.keepoutX && Math.abs(y) < c.keepoutY) {
-      const px = x === 0 ? 1 : Math.sign(x)
-      x = px * randRange(c.keepoutX, c.boundsX)
-      if (Math.random() < 0.5) y = Math.sign(y || 1) * randRange(c.keepoutY, c.boundsY)
+    // Cycle regions so it visits top / bottom / sides / centre over time.
+    this.region = (this.region + 1 + Math.floor(Math.random() * 3)) % 5
+    let x: number
+    let y: number
+    let z = randRange(c.minDepth, c.maxDepth)
+    switch (this.region) {
+      case 0: // top
+        x = randRange(-c.boundsX, c.boundsX) * 0.85
+        y = randRange(c.keepoutY, c.boundsY)
+        break
+      case 1: // bottom
+        x = randRange(-c.boundsX, c.boundsX) * 0.85
+        y = -randRange(c.keepoutY, c.boundsY)
+        break
+      case 2: // left
+        x = -randRange(c.keepoutX, c.boundsX)
+        y = randRange(-c.boundsY, c.boundsY) * 0.85
+        break
+      case 3: // right
+        x = randRange(c.keepoutX, c.boundsX)
+        y = randRange(-c.boundsY, c.boundsY) * 0.85
+        break
+      default: // occasional deep pass near centre (small, non-obstructive)
+        x = randRange(-c.keepoutX, c.keepoutX) * 0.7
+        y = randRange(-c.keepoutY, c.keepoutY) * 0.7
+        z = randRange(c.minDepth, c.minDepth * 0.4)
     }
     if (inward) {
       x *= 0.7
@@ -88,7 +110,7 @@ export class FlightModel {
     const c = this.cfg
     const side = Math.random() < 0.5 ? -1 : 1
     this.target.set(
-      side * c.boundsX * 2.0,
+      side * c.boundsX * 2.1,
       randRange(-c.boundsY, c.boundsY),
       randRange(c.minDepth, c.maxDepth * 0.5)
     )
@@ -96,100 +118,110 @@ export class FlightModel {
 
   update(dt: number): void {
     const c = this.cfg
-    this.time += dt
+    const t = (this.time += dt)
 
     // --- Phase / presence machine ------------------------------------------
-    this.phaseTimer += dt
     if (this.phase === 'entering') {
-      this.presence = Math.min(1, this.presence + dt / 2.6)
-      if (this.presence >= 1) this.phase = 'roaming'
+      this.presence = Math.min(1, this.presence + dt / 2.2)
+      if (this.presence >= 1) {
+        this.phase = 'roaming'
+        this.roamTimer = randRange(c.roamDurationMin, c.roamDurationMax)
+      }
     } else if (this.phase === 'roaming') {
-      this.presence = Math.min(1, this.presence + dt)
-      // Occasionally wander off into the wider world.
-      if (this.phaseTimer > 12 && Math.random() < 0.03 * dt) {
+      this.presence = 1
+      this.roamTimer -= dt
+      if (this.roamTimer <= 0) {
         this.phase = 'leaving'
-        this.phaseTimer = 0
         this.pickExitTarget()
       }
+    } else if (this.phase === 'leaving') {
+      this.presence = Math.max(0, this.presence - dt / 2.0)
+      const outside = Math.abs(this.position.x) > c.boundsX * 1.6 || this.position.z > c.maxDepth
+      if (this.presence <= 0 && outside) {
+        this.phase = 'gone'
+        this.goneTimer = randRange(c.offscreenDelayMin, c.offscreenDelayMax)
+      }
     } else {
-      // leaving: fade as it heads out, then respawn from a fresh edge.
-      this.presence = Math.max(0, this.presence - dt / 2.2)
-      const outside =
-        Math.abs(this.position.x) > c.boundsX * 1.6 || this.position.z > c.maxDepth
-      if (this.presence <= 0 && (outside || this.phaseTimer > 8)) {
-        this.spawn()
-        return
+      // gone: absent from the scene for a beat, then return afresh.
+      this.presence = 0
+      this.goneTimer -= dt
+      if (this.goneTimer <= 0) this.spawn()
+      return
+    }
+
+    // --- Retarget & glide (roaming only) -----------------------------------
+    if (this.phase === 'roaming') {
+      this.retarget -= dt
+      if (this.retarget <= 0 || this.position.distanceToSquared(this.target) < 0.5) {
+        this.pickTarget(false)
+        this.retarget = randRange(2, 5)
+      }
+      this.glideTimer -= dt
+      if (this.gliding) {
+        if (this.glideTimer <= 0) this.gliding = false
+      } else if (Math.random() < c.glideProbability * dt) {
+        this.gliding = true
+        this.glideTimer = randRange(0.6, 1.8)
       }
     }
 
-    // --- Retarget & glide state --------------------------------------------
-    this.retarget -= dt
-    if (this.phase !== 'leaving' && (this.retarget <= 0 || this.position.distanceToSquared(this.target) < 0.5)) {
-      this.pickTarget(false)
-      this.retarget = randRange(2.5, 6)
-    }
-    this.glideTimer -= dt
-    if (this.gliding) {
-      if (this.glideTimer <= 0) this.gliding = false
-    } else if (this.phase === 'roaming' && Math.random() < c.glideProbability * dt) {
-      this.gliding = true
-      this.glideTimer = randRange(0.6, 1.7)
-    }
-
-    // --- Desired direction (primary trajectory + keep-out) ------------------
+    // --- Desired direction: toward target, gently curved by wander ---------
     this.desired.copy(this.target).sub(this.position)
     if (this.desired.lengthSq() > 1e-6) this.desired.normalize()
-    // Push out of the clock keep-out ellipsoid when too close to the view axis.
-    if (
-      Math.abs(this.position.x) < c.keepoutX &&
-      Math.abs(this.position.y) < c.keepoutY &&
-      Math.abs(this.position.z) < c.keepoutZ
-    ) {
-      const nx = this.position.x === 0 ? randRange(-1, 1) : this.position.x
-      const ny = this.position.y === 0 ? randRange(-1, 1) : this.position.y
-      this.tmp.set(nx, ny, 0).normalize()
-      this.desired.addScaledVector(this.tmp, 1.4).normalize()
+    this.wanderAngle += (Math.sin(t * 0.5 + this.seed) * 0.6 + Math.sin(t * 0.23 + this.seed * 1.7) * 0.4) * dt
+    this.desired.applyAxisAngle(UP, Math.sin(this.wanderAngle) * 0.35)
+    this.desired.y += Math.sin(t * 0.7 + this.seed) * 0.05
+    if (this.desired.lengthSq() > 1e-6) this.desired.normalize()
+
+    // Push away from the clock, strongest near the clock plane (z ≈ 0).
+    if (Math.abs(this.position.x) < c.keepoutX && Math.abs(this.position.y) < c.keepoutY) {
+      const pushScale = Math.max(0, 1 - Math.abs(this.position.z) / c.keepoutZ)
+      if (pushScale > 0) {
+        const nx = this.position.x === 0 ? randRange(-1, 1) : this.position.x
+        const ny = this.position.y === 0 ? randRange(-1, 1) : this.position.y
+        this.tmp.set(nx, ny, 0).normalize()
+        this.desired.addScaledVector(this.tmp, 1.5 * pushScale).normalize()
+      }
     }
 
-    // --- Ease heading toward desired (turn) ---------------------------------
+    // --- Target speed: cruise varies; slower in glides/turns, faster if near
+    const depthNorm = clamp01((this.position.z - c.minDepth) / (c.maxDepth - c.minDepth))
+    const cruise = c.minSpeed + (c.maxSpeed - c.minSpeed) * (0.45 + 0.35 * Math.sin(t * 0.19 + this.seed))
+    const align = Math.max(0, this.desired.dot(this.forward))
+    let targetSpeed = (this.gliding ? c.minSpeed * 1.05 : cruise) * (0.55 + 0.45 * align)
+    targetSpeed *= 1 + c.depthSpeedBoost * depthNorm
+
+    // --- Momentum: ease velocity toward desired velocity -------------------
     this.prevForward.copy(this.forward)
-    this.forward.lerp(this.desired, smooth(c.turnStrength, dt))
-    if (this.forward.lengthSq() < 1e-6) this.forward.copy(this.prevForward)
-    else this.forward.normalize()
+    this.tmp.copy(this.desired).multiplyScalar(targetSpeed)
+    this.velocity.lerp(this.tmp, smooth(c.turnStrength, dt))
+    this.speed = this.velocity.length()
+    if (this.speed > 1e-4) this.forward.copy(this.velocity).multiplyScalar(1 / this.speed)
+    this.position.addScaledVector(this.velocity, dt)
 
-    // --- Speed: cruise varies slowly; slower in glides and hard turns -------
-    const cruise = c.minSpeed + (c.maxSpeed - c.minSpeed) * (0.45 + 0.35 * Math.sin(this.time * 0.19 + this.driftSeed))
-    const turnCos = Math.max(0, this.forward.dot(this.prevForward))
-    this.targetSpeed = (this.gliding ? c.minSpeed * 1.05 : cruise) * (0.6 + 0.4 * turnCos)
-    this.speed += (this.targetSpeed - this.speed) * smooth(2.4, dt)
-
-    // --- Integrate position -------------------------------------------------
-    this.position.addScaledVector(this.forward, this.speed * dt)
-
-    // --- Secondary drift + vertical bob (layered), applied to render pos ----
-    const t = this.time
-    const driftX = Math.sin(t * 0.53 + this.driftSeed) * 0.6 + Math.sin(t * 0.19 + 2.1) * 0.4
-    const driftY = Math.sin(t * 0.61 + 1.7) * 0.5 + Math.sin(t * 0.23 + this.driftSeed) * 0.5
-    const bob = Math.sin(t * 2.1 + this.driftSeed) * c.verticalDrift * (0.5 + 0.5 * this.speedNorm)
+    // --- Secondary drift + bob (calmer when far) ---------------------------
+    const driftScale = 0.5 + 0.5 * depthNorm
+    const driftX = Math.sin(t * 0.53 + this.seed) * 0.6 + Math.sin(t * 0.19 + 2.1) * 0.4
+    const driftY = Math.sin(t * 0.61 + 1.7) * 0.5 + Math.sin(t * 0.23 + this.seed) * 0.5
+    const bob = Math.sin(t * 2.1 + this.seed) * c.verticalDrift * (0.5 + 0.5 * this.speedNorm)
     this.visualPosition.set(
-      this.position.x + driftX * c.driftStrength * 0.35,
-      this.position.y + driftY * c.driftStrength * 0.3 + bob,
+      this.position.x + driftX * c.driftStrength * 0.35 * driftScale,
+      this.position.y + driftY * c.driftStrength * 0.3 * driftScale + bob,
       this.position.z
     )
 
-    // --- Banking (roll) into turns + pitch from climb/dive ------------------
-    // Signed horizontal turn: cross product y-component of prev->cur heading.
+    // --- Banking (roll) into turns + pitch from climb/dive -----------------
+    const turnCos = Math.max(0, this.forward.dot(this.prevForward))
     const turnSign = this.prevForward.x * this.forward.z - this.prevForward.z * this.forward.x
-    const turnMag = 1 - turnCos
-    const targetRoll = clampSym(turnSign * turnMag * 40, c.bankAmount)
+    const targetRoll = clampSym(turnSign * (1 - turnCos) * 45, c.bankAmount)
     this.roll += (targetRoll - this.roll) * smooth(3.5, dt)
-    const targetPitch = clampSym(this.forward.y * c.pitchAmount * 2.2, c.pitchAmount)
+    const targetPitch = clampSym(this.forward.y * c.pitchAmount * 2.4, c.pitchAmount)
     this.pitch += (targetPitch - this.pitch) * smooth(3, dt)
   }
 
   get speedNorm(): number {
     const c = this.cfg
-    return Math.min(1, Math.max(0, (this.speed - c.minSpeed) / (c.maxSpeed - c.minSpeed)))
+    return clamp01((this.speed - c.minSpeed) / (c.maxSpeed - c.minSpeed))
   }
 }
 
