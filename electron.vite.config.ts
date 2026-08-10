@@ -19,6 +19,7 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    assetsInclude: ['**/*.glb'],
     resolve: {
       alias: { '@shared': shared }
     },

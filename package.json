@@ -24,6 +24,7 @@
     "electron": "^31.3.0",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
+    "three": "^0.169.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.0"
   },
