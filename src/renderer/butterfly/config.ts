@@ -46,14 +46,6 @@ export interface ButterflyConfig {
   /** Depth band around the clock plane where avoidance is strongest. */
   keepoutZ: number
 
-  // --- Lifecycle ---
-  /** Seconds of roaming before it wanders off-screen (min/max). */
-  roamDurationMin: number
-  roamDurationMax: number
-  /** Seconds it stays gone before returning from a new direction (min/max). */
-  offscreenDelayMin: number
-  offscreenDelayMax: number
-
   // --- Wings ---
   /** Base wing-beat playback rate (multiplier on the baked clip). */
   wingSpeed: number
@@ -99,11 +91,6 @@ export const butterflyConfig: ButterflyConfig = {
   keepoutX: 1.7,
   keepoutY: 1.1,
   keepoutZ: 2.0,
-
-  roamDurationMin: 14,
-  roamDurationMax: 26,
-  offscreenDelayMin: 3,
-  offscreenDelayMax: 8,
 
   wingSpeed: 1.0,
   wingAmplitude: 0.35,

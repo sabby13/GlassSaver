@@ -7,7 +7,7 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 /** Frame-rate independent smoothing factor for an exponential approach. */
 const smooth = (rate: number, dt: number): number => 1 - Math.exp(-rate * dt)
 
-type Phase = 'entering' | 'roaming' | 'leaving' | 'gone'
+type Phase = 'entering' | 'roaming'
 
 /**
  * Steering-based flight with momentum. Velocity eases toward a desired velocity
@@ -37,8 +37,6 @@ export class FlightModel {
 
   private phase: Phase = 'entering'
   private retarget = 0
-  private roamTimer = 0
-  private goneTimer = 0
   private gliding = false
   private glideTimer = 0
   private wanderAngle = Math.random() * Math.PI * 2
@@ -106,50 +104,19 @@ export class FlightModel {
     this.target.set(x, y, z)
   }
 
-  private pickExitTarget(): void {
-    const c = this.cfg
-    const side = Math.random() < 0.5 ? -1 : 1
-    this.target.set(
-      side * c.boundsX * 2.1,
-      randRange(-c.boundsY, c.boundsY),
-      randRange(c.minDepth, c.maxDepth * 0.5)
-    )
-  }
-
   update(dt: number): void {
     const c = this.cfg
     const t = (this.time += dt)
 
-    // --- Phase / presence machine ------------------------------------------
+    // --- Presence: brief initial fly-in, then always fully present ---------
     if (this.phase === 'entering') {
       this.presence = Math.min(1, this.presence + dt / 2.2)
-      if (this.presence >= 1) {
-        this.phase = 'roaming'
-        this.roamTimer = randRange(c.roamDurationMin, c.roamDurationMax)
-      }
-    } else if (this.phase === 'roaming') {
-      this.presence = 1
-      this.roamTimer -= dt
-      if (this.roamTimer <= 0) {
-        this.phase = 'leaving'
-        this.pickExitTarget()
-      }
-    } else if (this.phase === 'leaving') {
-      this.presence = Math.max(0, this.presence - dt / 2.0)
-      const outside = Math.abs(this.position.x) > c.boundsX * 1.6 || this.position.z > c.maxDepth
-      if (this.presence <= 0 && outside) {
-        this.phase = 'gone'
-        this.goneTimer = randRange(c.offscreenDelayMin, c.offscreenDelayMax)
-      }
+      if (this.presence >= 1) this.phase = 'roaming'
     } else {
-      // gone: absent from the scene for a beat, then return afresh.
-      this.presence = 0
-      this.goneTimer -= dt
-      if (this.goneTimer <= 0) this.spawn()
-      return
+      this.presence = 1
     }
 
-    // --- Retarget & glide (roaming only) -----------------------------------
+    // --- Retarget & glide (once roaming) -----------------------------------
     if (this.phase === 'roaming') {
       this.retarget -= dt
       if (this.retarget <= 0 || this.position.distanceToSquared(this.target) < 0.5) {
