@@ -10,11 +10,11 @@ const smooth = (rate: number, dt: number): number => 1 - Math.exp(-rate * dt)
 type Phase = 'entering' | 'roaming'
 
 /**
- * Steering-based flight with momentum. Velocity eases toward a desired velocity
- * (so heading and speed both have inertia), the desired direction is gently
- * curved by a wander angle, targets are spread across screen regions, and the
- * butterfly periodically leaves the frame entirely and returns later from a new
- * direction/depth. No allocation happens in update(); temp vectors are reused.
+ * Steering flight over a flat horizontal plane (X = screen horizontal, Z =
+ * screen vertical) at a gentle altitude Y. Heading (yaw) follows the horizontal
+ * velocity only, so the butterfly never pitches onto its side — the wing tops
+ * always face the straight-down camera. Momentum, curved wander, banking,
+ * glides, and clock keep-out are preserved. No allocation in update().
  */
 export class FlightModel {
   readonly position = new Vector3()
@@ -24,8 +24,8 @@ export class FlightModel {
 
   speed = 0
   roll = 0
-  pitch = 0
-  /** 0..1 fade for entrance, exit, and the "off in the wider world" states. */
+  /** Pitch stays ~0 so the wings remain flat to the camera. */
+  readonly pitch = 0
   presence = 0
 
   private readonly cfg: ButterflyConfig
@@ -49,86 +49,63 @@ export class FlightModel {
     this.spawn()
   }
 
-  /** Enter from a distant, off-centre point, from a fresh side and depth. */
   spawn(): void {
     const c = this.cfg
+    const midY = (c.heightMin + c.heightMax) * 0.5
     if (c.hover) {
-      // Appear within the hover area and gently settle in.
       const a = Math.random() * Math.PI * 2
       this.position.set(
         c.hoverCenter[0] + Math.cos(a) * c.hoverRadius * 0.5,
-        c.hoverCenter[1] + Math.sin(a) * c.hoverRadius * 0.5,
-        c.hoverCenter[2]
+        midY,
+        c.hoverCenter[1] + Math.sin(a) * c.hoverRadius * 0.5
       )
-      this.forward.set(Math.cos(a + 1.2), 0, Math.sin(a + 1.2) * 0.3).normalize()
-      this.velocity.copy(this.forward).multiplyScalar(c.minSpeed)
-      this.prevForward.copy(this.forward)
-      this.speed = c.minSpeed
-      this.presence = 0
-      this.phase = 'entering'
-      this.pickTarget(true)
-      this.visualPosition.copy(this.position)
-      return
+    } else {
+      const side = Math.random() < 0.5 ? -1 : 1
+      this.position.set(side * randRange(c.areaX * 0.7, c.areaX), midY, randRange(-c.areaY, c.areaY))
     }
-    const side = Math.random() < 0.5 ? -1 : 1
-    this.position.set(
-      side * randRange(c.boundsX * 0.8, c.boundsX * 1.2),
-      randRange(-c.boundsY * 0.6, c.boundsY * 0.9),
-      randRange(c.minDepth, c.minDepth * 0.5)
-    )
-    this.forward.set(-side, 0, 0.2).normalize()
+    this.forward.set(Math.random() < 0.5 ? -1 : 1, 0, randRange(-0.6, 0.6)).normalize()
     this.velocity.copy(this.forward).multiplyScalar(c.minSpeed)
     this.prevForward.copy(this.forward)
     this.speed = c.minSpeed
     this.presence = 0
     this.phase = 'entering'
-    this.pickTarget(true)
+    this.pickTarget()
     this.visualPosition.copy(this.position)
   }
 
-  private pickTarget(inward: boolean): void {
+  private pickTarget(): void {
     const c = this.cfg
+    const y = randRange(c.heightMin, c.heightMax)
     if (c.hover) {
-      // Stay within the hover disc: gentle wandering around one spot.
       const a = Math.random() * Math.PI * 2
       const r = Math.sqrt(Math.random()) * c.hoverRadius
-      this.target.set(
-        c.hoverCenter[0] + Math.cos(a) * r,
-        c.hoverCenter[1] + Math.sin(a) * r * 0.85,
-        c.hoverCenter[2] + randRange(-0.7, 0.7)
-      )
+      this.target.set(c.hoverCenter[0] + Math.cos(a) * r, y, c.hoverCenter[1] + Math.sin(a) * r)
       return
     }
-    // Cycle regions so it visits top / bottom / sides / centre over time.
+    // Spread targets across screen regions so it uses the whole space.
     this.region = (this.region + 1 + Math.floor(Math.random() * 3)) % 5
     let x: number
-    let y: number
-    let z = randRange(c.minDepth, c.maxDepth)
+    let z: number
     switch (this.region) {
-      case 0: // top
-        x = randRange(-c.boundsX, c.boundsX) * 0.85
-        y = randRange(c.keepoutY, c.boundsY)
+      case 0: // top of screen
+        x = randRange(-c.areaX, c.areaX) * 0.85
+        z = -randRange(c.keepoutY, c.areaY)
         break
       case 1: // bottom
-        x = randRange(-c.boundsX, c.boundsX) * 0.85
-        y = -randRange(c.keepoutY, c.boundsY)
+        x = randRange(-c.areaX, c.areaX) * 0.85
+        z = randRange(c.keepoutY, c.areaY)
         break
       case 2: // left
-        x = -randRange(c.keepoutX, c.boundsX)
-        y = randRange(-c.boundsY, c.boundsY) * 0.85
+        x = -randRange(c.keepoutX, c.areaX)
+        z = randRange(-c.areaY, c.areaY) * 0.85
         break
       case 3: // right
-        x = randRange(c.keepoutX, c.boundsX)
-        y = randRange(-c.boundsY, c.boundsY) * 0.85
+        x = randRange(c.keepoutX, c.areaX)
+        z = randRange(-c.areaY, c.areaY) * 0.85
         break
-      default: // occasional deep pass near centre (small, non-obstructive)
-        x = randRange(-c.keepoutX, c.keepoutX) * 0.7
-        y = randRange(-c.keepoutY, c.keepoutY) * 0.7
-        z = randRange(c.minDepth, c.minDepth * 0.4)
-    }
-    if (inward) {
-      x *= 0.7
-      y *= 0.7
+      default: // wander wider, occasionally past centre
+        x = randRange(-c.areaX, c.areaX)
+        z = randRange(-c.areaY, c.areaY)
     }
     this.target.set(x, y, z)
   }
@@ -137,7 +114,7 @@ export class FlightModel {
     const c = this.cfg
     const t = (this.time += dt)
 
-    // --- Presence: brief initial fly-in, then always fully present ---------
+    // --- Presence: brief fly-in, then always fully present -----------------
     if (this.phase === 'entering') {
       this.presence = Math.min(1, this.presence + dt / 2.2)
       if (this.presence >= 1) this.phase = 'roaming'
@@ -145,11 +122,13 @@ export class FlightModel {
       this.presence = 1
     }
 
-    // --- Retarget & glide (once roaming) -----------------------------------
+    // --- Retarget & glide (roaming) ----------------------------------------
     if (this.phase === 'roaming') {
       this.retarget -= dt
-      if (this.retarget <= 0 || this.position.distanceToSquared(this.target) < 0.5) {
-        this.pickTarget(false)
+      const dx = this.target.x - this.position.x
+      const dz = this.target.z - this.position.z
+      if (this.retarget <= 0 || dx * dx + dz * dz < 0.5) {
+        this.pickTarget()
         this.retarget = randRange(2, 5)
       }
       this.glideTimer -= dt
@@ -161,27 +140,23 @@ export class FlightModel {
       }
     }
 
-    // --- Desired direction: toward target, gently curved by wander ---------
+    // --- Desired direction: toward target, gently curved -------------------
     this.desired.copy(this.target).sub(this.position)
     if (this.desired.lengthSq() > 1e-6) this.desired.normalize()
     this.wanderAngle += (Math.sin(t * 0.5 + this.seed) * 0.6 + Math.sin(t * 0.23 + this.seed * 1.7) * 0.4) * dt
     this.desired.applyAxisAngle(UP, Math.sin(this.wanderAngle) * 0.35)
-    this.desired.y += Math.sin(t * 0.7 + this.seed) * 0.05
     if (this.desired.lengthSq() > 1e-6) this.desired.normalize()
 
-    // Push away from the clock, strongest near the clock plane (z ≈ 0).
-    if (Math.abs(this.position.x) < c.keepoutX && Math.abs(this.position.y) < c.keepoutY) {
-      const pushScale = Math.max(0, 1 - Math.abs(this.position.z) / c.keepoutZ)
-      if (pushScale > 0) {
-        const nx = this.position.x === 0 ? randRange(-1, 1) : this.position.x
-        const ny = this.position.y === 0 ? randRange(-1, 1) : this.position.y
-        this.tmp.set(nx, ny, 0).normalize()
-        this.desired.addScaledVector(this.tmp, 1.5 * pushScale).normalize()
-      }
+    // Push away from screen centre (the clock), on the X/Z plane.
+    if (Math.abs(this.position.x) < c.keepoutX && Math.abs(this.position.z) < c.keepoutY) {
+      const nx = this.position.x === 0 ? randRange(-1, 1) : this.position.x
+      const nz = this.position.z === 0 ? randRange(-1, 1) : this.position.z
+      this.tmp.set(nx, 0, nz).normalize()
+      this.desired.addScaledVector(this.tmp, 1.5).normalize()
     }
 
-    // --- Target speed: cruise varies; slower in glides/turns, faster if near
-    const depthNorm = clamp01((this.position.z - c.minDepth) / (c.maxDepth - c.minDepth))
+    // --- Speed: cruise varies; slower in glides/turns, faster if high ------
+    const depthNorm = clamp01((this.position.y - c.heightMin) / (c.heightMax - c.heightMin))
     const cruise = c.minSpeed + (c.maxSpeed - c.minSpeed) * (0.45 + 0.35 * Math.sin(t * 0.19 + this.seed))
     const align = Math.max(0, this.desired.dot(this.forward))
     let targetSpeed = (this.gliding ? c.minSpeed * 1.05 : cruise) * (0.55 + 0.45 * align)
@@ -192,27 +167,31 @@ export class FlightModel {
     this.tmp.copy(this.desired).multiplyScalar(targetSpeed)
     this.velocity.lerp(this.tmp, smooth(c.turnStrength, dt))
     this.speed = this.velocity.length()
-    if (this.speed > 1e-4) this.forward.copy(this.velocity).multiplyScalar(1 / this.speed)
     this.position.addScaledVector(this.velocity, dt)
 
-    // --- Secondary drift + bob (calmer when far) ---------------------------
-    const driftScale = 0.5 + 0.5 * depthNorm
+    // Keep altitude inside its band.
+    if (this.position.y < c.heightMin) this.position.y = c.heightMin
+    else if (this.position.y > c.heightMax) this.position.y = c.heightMax
+
+    // --- Heading (yaw) follows horizontal velocity only --------------------
+    this.tmp.set(this.velocity.x, 0, this.velocity.z)
+    if (this.tmp.lengthSq() > 1e-5) this.forward.copy(this.tmp).normalize()
+
+    // --- Secondary drift + altitude bob ------------------------------------
     const driftX = Math.sin(t * 0.53 + this.seed) * 0.6 + Math.sin(t * 0.19 + 2.1) * 0.4
-    const driftY = Math.sin(t * 0.61 + 1.7) * 0.5 + Math.sin(t * 0.23 + this.seed) * 0.5
+    const driftZ = Math.sin(t * 0.61 + 1.7) * 0.5 + Math.sin(t * 0.23 + this.seed) * 0.5
     const bob = Math.sin(t * 2.1 + this.seed) * c.verticalDrift * (0.5 + 0.5 * this.speedNorm)
     this.visualPosition.set(
-      this.position.x + driftX * c.driftStrength * 0.35 * driftScale,
-      this.position.y + driftY * c.driftStrength * 0.3 * driftScale + bob,
-      this.position.z
+      this.position.x + driftX * c.driftStrength * 0.35,
+      this.position.y + bob,
+      this.position.z + driftZ * c.driftStrength * 0.35
     )
 
-    // --- Banking (roll) into turns + pitch from climb/dive -----------------
+    // --- Banking (roll) into horizontal turns; no pitch --------------------
     const turnCos = Math.max(0, this.forward.dot(this.prevForward))
     const turnSign = this.prevForward.x * this.forward.z - this.prevForward.z * this.forward.x
     const targetRoll = clampSym(turnSign * (1 - turnCos) * 45, c.bankAmount)
     this.roll += (targetRoll - this.roll) * smooth(3.5, dt)
-    const targetPitch = clampSym(this.forward.y * c.pitchAmount * 2.4, c.pitchAmount)
-    this.pitch += (targetPitch - this.pitch) * smooth(3, dt)
   }
 
   get speedNorm(): number {

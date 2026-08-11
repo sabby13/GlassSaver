@@ -1,67 +1,61 @@
 /**
- * Central, tunable configuration for the butterfly system. Every visual and
- * behavioural constant lives here so the feel can be dialled in without
- * touching the simulation code. World units are metres; the camera sits at
- * z = +cameraDistance looking toward -z.
+ * Central, tunable configuration for the butterfly system.
+ *
+ * Coordinate model: the butterfly flies over a flat horizontal plane (world
+ * X = screen horizontal, world Z = screen vertical) at a small altitude Y, and
+ * the camera looks straight down. Because flight stays horizontal, the wing
+ * tops always face the camera — a clean top-down view from any direction.
  */
 export interface ButterflyConfig {
   enabled: boolean
 
-  /** Base normalised world size (largest model dimension, metres). Depth makes
-   *  the apparent size vary around this via perspective. */
+  /** Base normalised world size (largest model dimension, metres). */
   scale: number
   /** Overall material opacity ceiling (atmospheric fade multiplies under this). */
   opacity: number
 
-  // --- Camera / space ---
-  cameraDistance: number
-  /** Camera height above the butterfly — looks down so the wing tops face us. */
+  // --- Camera (looks straight down) ---
   cameraHeight: number
   fov: number
-  /** Half-extents of the wander box in view space (x, y) at the z=0 plane. */
-  boundsX: number
-  boundsY: number
-  /** Depth range the butterfly roams: more negative = further from camera. */
-  minDepth: number
-  maxDepth: number
+
+  // --- Play area (on the ground plane) ---
+  /** Half-extent left/right (world X). */
+  areaX: number
+  /** Half-extent up/down on screen (world Z). */
+  areaY: number
+  /** Altitude band above the plane (world Y). Higher = closer to camera = larger. */
+  heightMin: number
+  heightMax: number
 
   // --- Flight ---
   minSpeed: number
   maxSpeed: number
-  /** How quickly velocity eases toward its target — lower = more momentum/inertia. */
+  /** How quickly velocity eases toward its target — lower = more momentum. */
   turnStrength: number
-  /** Subtle speed increase when close to the camera (0 = none). */
+  /** Subtle speed increase at higher altitude (closer to camera). */
   depthSpeedBoost: number
-  /** Strength of the slow secondary drift. */
   driftStrength: number
+  /** Gentle altitude bob. */
   verticalDrift: number
   /** Max bank (roll) into a turn, radians. */
   bankAmount: number
-  /** Max pitch from climb/dive, radians. */
-  pitchAmount: number
   /** Chance per second of entering a short glide. */
   glideProbability: number
 
-  // --- Hover ---
-  /** Confine flight to a small area (a gentle hover) instead of the whole screen. */
+  // --- Hover (optional: confine to a spot on the plane) ---
   hover: boolean
-  /** Centre of the hover area in view space [x, y, z]. -x = left, -y = down. */
-  hoverCenter: [number, number, number]
-  /** Radius of the hover area (x/y), world units. */
+  /** Hover centre on the plane [x, z]. -x = left, -z = up on screen. */
+  hoverCenter: [number, number]
   hoverRadius: number
 
   // --- Clock keep-out (screen centre) ---
   keepoutX: number
   keepoutY: number
-  /** Depth band around the clock plane where avoidance is strongest. */
-  keepoutZ: number
 
   // --- Wings ---
-  /** Base wing-beat playback rate (multiplier on the baked clip). */
   wingSpeed: number
   /** How much the wing stroke opens/relaxes during glides (0..1). */
   wingAmplitude: number
-  /** Index of the baked clip to use as the wing beat. */
   wingClipIndex: number
 
   // --- Orientation ---
@@ -70,7 +64,6 @@ export interface ButterflyConfig {
 
   // --- Rendering ---
   exposure: number
-  /** Environment-map reflection strength on the butterfly (grounds it in the scene). */
   envIntensity: number
   maxPixelRatio: number
 }
@@ -78,34 +71,32 @@ export interface ButterflyConfig {
 export const butterflyConfig: ButterflyConfig = {
   enabled: true,
 
-  scale: 1.7,
+  scale: 1.8,
   opacity: 0.97,
 
-  cameraDistance: 3.5,
-  cameraHeight: 8,
-  fov: 35,
-  boundsX: 4.2,
-  boundsY: 2.5,
-  minDepth: -5.5,
-  maxDepth: 1.0,
+  cameraHeight: 9,
+  fov: 42,
+
+  areaX: 6,
+  areaY: 2.6,
+  heightMin: -0.4,
+  heightMax: 1.8,
 
   minSpeed: 0.35,
   maxSpeed: 1.5,
   turnStrength: 1.3,
-  depthSpeedBoost: 0.35,
+  depthSpeedBoost: 0.3,
   driftStrength: 0.5,
-  verticalDrift: 0.22,
-  bankAmount: 0.22,
-  pitchAmount: 0.1,
+  verticalDrift: 0.18,
+  bankAmount: 0.28,
   glideProbability: 0.14,
 
   hover: false,
-  hoverCenter: [-2.4, -1.3, 0.2],
+  hoverCenter: [-2.4, 1.0],
   hoverRadius: 1.35,
 
   keepoutX: 1.7,
-  keepoutY: 1.1,
-  keepoutZ: 2.0,
+  keepoutY: 0.9,
 
   wingSpeed: 1.7,
   wingAmplitude: 0.2,

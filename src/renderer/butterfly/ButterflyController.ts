@@ -73,8 +73,10 @@ export class ButterflyController {
     this.renderer.outputColorSpace = SRGBColorSpace
 
     this.camera = new PerspectiveCamera(config.fov, 1, 0.1, 100)
-    // Raised and looking down so we mostly see the wing tops, not the underside.
-    this.camera.position.set(0, config.cameraHeight, config.cameraDistance)
+    // Looks straight down the plane so the wing tops always face us. The up
+    // vector is set to -Z so screen-vertical maps to world Z.
+    this.camera.up.set(0, 0, -1)
+    this.camera.position.set(0, config.cameraHeight, 0)
     this.camera.lookAt(0, 0, 0)
 
     // Soft, ambient-leaning lighting so the butterfly sits in the scene rather
@@ -181,9 +183,11 @@ export class ButterflyController {
       this.qPitch.setFromAxisAngle(this.right, -this.flight.pitch)
       this.pivot.quaternion.premultiply(this.qPitch)
 
-      // Opacity: entrance/exit presence × subtle atmospheric fade with depth.
-      const depthT = clamp01((this.flight.position.z - this.cfg.minDepth) / (0 - this.cfg.minDepth))
-      const depthFade = 0.45 + 0.55 * depthT
+      // Opacity: presence × subtle atmospheric fade with altitude (depth).
+      const depthT = clamp01(
+        (this.flight.position.y - this.cfg.heightMin) / (this.cfg.heightMax - this.cfg.heightMin)
+      )
+      const depthFade = 0.6 + 0.4 * depthT
       const opacity = this.cfg.opacity * this.flight.presence * depthFade
       for (const m of this.materials) m.opacity = opacity
 
