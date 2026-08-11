@@ -84,7 +84,7 @@ export const butterflyConfig: ButterflyConfig = {
 
   minSpeed: 0.35,
   maxSpeed: 1.5,
-  turnStrength: 1.3,
+  turnStrength: 0.6,
   depthSpeedBoost: 0.3,
   driftStrength: 0.5,
   verticalDrift: 0.18,
