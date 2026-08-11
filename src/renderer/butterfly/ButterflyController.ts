@@ -73,7 +73,8 @@ export class ButterflyController {
     this.renderer.outputColorSpace = SRGBColorSpace
 
     this.camera = new PerspectiveCamera(config.fov, 1, 0.1, 100)
-    this.camera.position.set(0, 0, config.cameraDistance)
+    // Raised and looking down so we mostly see the wing tops, not the underside.
+    this.camera.position.set(0, config.cameraHeight, config.cameraDistance)
     this.camera.lookAt(0, 0, 0)
 
     // Soft, ambient-leaning lighting so the butterfly sits in the scene rather

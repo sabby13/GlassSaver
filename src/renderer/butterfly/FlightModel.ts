@@ -52,6 +52,24 @@ export class FlightModel {
   /** Enter from a distant, off-centre point, from a fresh side and depth. */
   spawn(): void {
     const c = this.cfg
+    if (c.hover) {
+      // Appear within the hover area and gently settle in.
+      const a = Math.random() * Math.PI * 2
+      this.position.set(
+        c.hoverCenter[0] + Math.cos(a) * c.hoverRadius * 0.5,
+        c.hoverCenter[1] + Math.sin(a) * c.hoverRadius * 0.5,
+        c.hoverCenter[2]
+      )
+      this.forward.set(Math.cos(a + 1.2), 0, Math.sin(a + 1.2) * 0.3).normalize()
+      this.velocity.copy(this.forward).multiplyScalar(c.minSpeed)
+      this.prevForward.copy(this.forward)
+      this.speed = c.minSpeed
+      this.presence = 0
+      this.phase = 'entering'
+      this.pickTarget(true)
+      this.visualPosition.copy(this.position)
+      return
+    }
     const side = Math.random() < 0.5 ? -1 : 1
     this.position.set(
       side * randRange(c.boundsX * 0.8, c.boundsX * 1.2),
@@ -70,6 +88,17 @@ export class FlightModel {
 
   private pickTarget(inward: boolean): void {
     const c = this.cfg
+    if (c.hover) {
+      // Stay within the hover disc: gentle wandering around one spot.
+      const a = Math.random() * Math.PI * 2
+      const r = Math.sqrt(Math.random()) * c.hoverRadius
+      this.target.set(
+        c.hoverCenter[0] + Math.cos(a) * r,
+        c.hoverCenter[1] + Math.sin(a) * r * 0.85,
+        c.hoverCenter[2] + randRange(-0.7, 0.7)
+      )
+      return
+    }
     // Cycle regions so it visits top / bottom / sides / centre over time.
     this.region = (this.region + 1 + Math.floor(Math.random() * 3)) % 5
     let x: number

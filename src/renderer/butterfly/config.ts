@@ -15,6 +15,8 @@ export interface ButterflyConfig {
 
   // --- Camera / space ---
   cameraDistance: number
+  /** Camera height above the butterfly — looks down so the wing tops face us. */
+  cameraHeight: number
   fov: number
   /** Half-extents of the wander box in view space (x, y) at the z=0 plane. */
   boundsX: number
@@ -39,6 +41,14 @@ export interface ButterflyConfig {
   pitchAmount: number
   /** Chance per second of entering a short glide. */
   glideProbability: number
+
+  // --- Hover ---
+  /** Confine flight to a small area (a gentle hover) instead of the whole screen. */
+  hover: boolean
+  /** Centre of the hover area in view space [x, y, z]. -x = left, -y = down. */
+  hoverCenter: [number, number, number]
+  /** Radius of the hover area (x/y), world units. */
+  hoverRadius: number
 
   // --- Clock keep-out (screen centre) ---
   keepoutX: number
@@ -68,10 +78,11 @@ export interface ButterflyConfig {
 export const butterflyConfig: ButterflyConfig = {
   enabled: true,
 
-  scale: 1.35,
+  scale: 1.7,
   opacity: 0.97,
 
-  cameraDistance: 6,
+  cameraDistance: 3.5,
+  cameraHeight: 8,
   fov: 35,
   boundsX: 4.2,
   boundsY: 2.5,
@@ -84,16 +95,20 @@ export const butterflyConfig: ButterflyConfig = {
   depthSpeedBoost: 0.35,
   driftStrength: 0.5,
   verticalDrift: 0.22,
-  bankAmount: 0.6,
-  pitchAmount: 0.3,
+  bankAmount: 0.22,
+  pitchAmount: 0.1,
   glideProbability: 0.14,
+
+  hover: false,
+  hoverCenter: [-2.4, -1.3, 0.2],
+  hoverRadius: 1.35,
 
   keepoutX: 1.7,
   keepoutY: 1.1,
   keepoutZ: 2.0,
 
-  wingSpeed: 1.0,
-  wingAmplitude: 0.35,
+  wingSpeed: 1.7,
+  wingAmplitude: 0.2,
   wingClipIndex: 0,
 
   modelOrientationOffset: [0, Math.PI, 0],

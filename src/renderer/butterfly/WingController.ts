@@ -34,9 +34,10 @@ export class WingController {
     // asymmetric shaping so the cadence never sounds metronomic.
     const rhythm =
       1 + 0.16 * Math.sin(this.time * 1.3 + this.seed) + 0.09 * Math.sin(this.time * 0.62)
-    const gliding = speedNorm < 0.18
-    let rate = this.cfg.wingSpeed * (0.55 + 0.85 * speedNorm) * rhythm
-    if (gliding) rate *= 0.35
+    const gliding = speedNorm < 0.16
+    // Keep an energetic base beat even when slow, so it always flaps clearly.
+    let rate = this.cfg.wingSpeed * (0.9 + 0.7 * speedNorm) * rhythm
+    if (gliding) rate *= 0.6
 
     // Ease the rate so beats speed up / slow down smoothly, never snapping.
     this.timeScale += (rate - this.timeScale) * (1 - Math.exp(-4 * dt))
