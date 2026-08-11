@@ -102,7 +102,6 @@ export function SettingsApp(): JSX.Element {
         <div className="card__row">
           <div className="card__text">
             <span className="card__label">Show seconds</span>
-            <span className="card__hint">Display the seconds digits</span>
           </div>
           <Toggle
             checked={settings.showSeconds}
