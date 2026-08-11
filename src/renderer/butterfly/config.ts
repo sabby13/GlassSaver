@@ -96,7 +96,7 @@ export const butterflyConfig: ButterflyConfig = {
   wingAmplitude: 0.35,
   wingClipIndex: 0,
 
-  modelOrientationOffset: [0, 0, 0],
+  modelOrientationOffset: [0, Math.PI, 0],
 
   exposure: 0.95,
   envIntensity: 0.35,
