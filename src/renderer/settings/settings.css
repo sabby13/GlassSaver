@@ -32,9 +32,9 @@ body {
 .settings {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   height: 100%;
-  padding: 20px;
+  padding: 16px;
 }
 
 .settings__header {
@@ -63,7 +63,7 @@ body {
 }
 
 .card__preview {
-  height: 96px;
+  height: 68px;
   background-color: #000;
 }
 
@@ -78,7 +78,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 10px 14px;
 }
 
 .card__text {
@@ -194,6 +194,40 @@ body {
 
 .toggle--on .toggle__thumb {
   transform: translateX(18px);
+}
+
+/* Segmented count selector (0–3). */
+.segmented {
+  display: inline-flex;
+  flex-shrink: 0;
+  background-color: #1c1c1e;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented__item {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  min-width: 30px;
+  height: 28px;
+  border-radius: 7px;
+  background-color: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.segmented__item:hover {
+  color: var(--text);
+}
+
+.segmented__item--on {
+  background-color: var(--accent);
+  color: #fff;
 }
 
 /* Push the exit button to the bottom. */

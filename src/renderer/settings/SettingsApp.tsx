@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_SETTINGS, type Settings } from '@shared/settings'
+import { DEFAULT_SETTINGS, MAX_BUTTERFLIES, type Settings } from '@shared/settings'
 import { toAssetUrl } from '../lib/assetUrl'
 import defaultWallpaper from '../assets/default-wallpaper.svg'
 import { Toggle } from './Toggle'
@@ -48,6 +48,7 @@ export function SettingsApp(): JSX.Element {
 
   const hasImage = settings.backgroundImage !== ''
   const previewSrc = hasImage ? toAssetUrl(settings.backgroundImage) : defaultWallpaper
+  const counts = Array.from({ length: MAX_BUTTERFLIES + 1 }, (_, i) => i)
 
   return (
     <div className="settings">
@@ -90,7 +91,6 @@ export function SettingsApp(): JSX.Element {
         <div className="card__row">
           <div className="card__text">
             <span className="card__label">24-hour time</span>
-            <span className="card__hint">Show 13:00 instead of 1:00</span>
           </div>
           <Toggle
             checked={settings.use24Hour}
@@ -109,6 +109,29 @@ export function SettingsApp(): JSX.Element {
             onChange={(value) => update({ showSeconds: value })}
             label="Show seconds"
           />
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card__row">
+          <div className="card__text">
+            <span className="card__label">Butterflies</span>
+          </div>
+          <div className="segmented" role="group" aria-label="Butterfly count">
+            {counts.map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={
+                  settings.butterflyCount === n ? 'segmented__item segmented__item--on' : 'segmented__item'
+                }
+                aria-pressed={settings.butterflyCount === n}
+                onClick={() => update({ butterflyCount: n })}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
-import { DEFAULT_SETTINGS, type Settings } from '@shared/settings'
+import { DEFAULT_SETTINGS, MAX_BUTTERFLIES, type Settings } from '@shared/settings'
 
 /**
  * Persistent, offline settings store backed by a single JSON file inside
@@ -27,8 +27,15 @@ function sanitize(input: unknown): Settings {
     use24Hour:
       typeof raw.use24Hour === 'boolean' ? raw.use24Hour : DEFAULT_SETTINGS.use24Hour,
     showSeconds:
-      typeof raw.showSeconds === 'boolean' ? raw.showSeconds : DEFAULT_SETTINGS.showSeconds
+      typeof raw.showSeconds === 'boolean' ? raw.showSeconds : DEFAULT_SETTINGS.showSeconds,
+    butterflyCount: clampCount(raw.butterflyCount)
   }
+}
+
+/** Coerce to an integer in [0, MAX_BUTTERFLIES], defaulting when invalid. */
+function clampCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_SETTINGS.butterflyCount
+  return Math.min(MAX_BUTTERFLIES, Math.max(0, Math.round(value)))
 }
 
 /** Write settings to disk, creating the userData directory if needed. */

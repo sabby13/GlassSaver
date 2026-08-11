@@ -11,12 +11,18 @@ export interface Settings {
   use24Hour: boolean
   /** Show seconds in the clock when true. */
   showSeconds: boolean
+  /** How many butterflies to show (0 to MAX_BUTTERFLIES). */
+  butterflyCount: number
 }
+
+/** Maximum number of butterflies the screensaver will render. */
+export const MAX_BUTTERFLIES = 3
 
 export const DEFAULT_SETTINGS: Settings = {
   backgroundImage: '',
   use24Hour: true,
-  showSeconds: false
+  showSeconds: false,
+  butterflyCount: 1
 }
 
 /** Image formats accepted by the background picker. */

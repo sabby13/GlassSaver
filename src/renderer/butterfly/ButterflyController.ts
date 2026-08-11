@@ -15,21 +15,31 @@ import {
   Vector3,
   WebGLRenderer
 } from 'three'
-import type { Material, Object3D, Texture } from 'three'
+import type { AnimationClip, Material, Object3D, Texture } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { MAX_BUTTERFLIES } from '@shared/settings'
 import { butterflyConfig, type ButterflyConfig } from './config'
 import { FlightModel } from './FlightModel'
 import { WingController } from './WingController'
 
 const FORWARD = new Vector3(0, 0, -1)
 const UP = new Vector3(0, 1, 0)
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+interface Butterfly {
+  pivot: Group
+  flight: FlightModel
+  wings: WingController | null
+  materials: Material[]
+}
 
 /**
- * Owns a small, isolated Three.js scene that renders a single butterfly flying
- * through space in front of (behind, in DOM terms, transparent over) the
- * wallpaper. Framework-agnostic: construct with a canvas, call start(), and
- * dispose() when done. Runs its own rAF loop; never touches React.
+ * Owns one isolated Three.js scene that renders up to a few butterflies flying
+ * over a flat plane, viewed straight down. A single renderer and a single rAF
+ * loop drive all of them. Construct with a canvas, load() the model once, then
+ * setCount(n) to show n butterflies; dispose() when done. Never touches React.
  */
 export class ButterflyController {
   private readonly cfg: ButterflyConfig
@@ -37,12 +47,15 @@ export class ButterflyController {
   private readonly scene = new Scene()
   private readonly camera: PerspectiveCamera
   private readonly clock = new Clock()
-  private readonly flight: FlightModel
 
-  private pivot: Group | null = null
-  private wings: WingController | null = null
+  private baseModel: Object3D | null = null
+  private clips: AnimationClip[] = []
+  private scaleFactor = 1
   private envTexture: Texture | null = null
-  private readonly materials: Material[] = []
+
+  private readonly butterflies: Butterfly[] = []
+  private desiredCount = 0
+  private loaded = false
 
   // Reused each frame — no per-frame allocation.
   private readonly q1 = new Quaternion()
@@ -56,7 +69,6 @@ export class ButterflyController {
 
   constructor(canvas: HTMLCanvasElement, config: ButterflyConfig = butterflyConfig) {
     this.cfg = config
-    this.flight = new FlightModel(config)
 
     this.renderer = new WebGLRenderer({
       canvas,
@@ -65,31 +77,25 @@ export class ButterflyController {
       powerPreference: 'high-performance'
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.maxPixelRatio))
-    // Fully transparent clear so only the butterfly is drawn; the wallpaper and
-    // clock show through everywhere else.
     this.renderer.setClearColor(0x000000, 0)
     this.renderer.toneMapping = ACESFilmicToneMapping
     this.renderer.toneMappingExposure = config.exposure
     this.renderer.outputColorSpace = SRGBColorSpace
 
     this.camera = new PerspectiveCamera(config.fov, 1, 0.1, 100)
-    // Looks straight down the plane so the wing tops always face us. The up
-    // vector is set to -Z so screen-vertical maps to world Z.
+    // Looks straight down so the wing tops always face us. Up = -Z maps
+    // screen-vertical to world Z.
     this.camera.up.set(0, 0, -1)
     this.camera.position.set(0, config.cameraHeight, 0)
     this.camera.lookAt(0, 0, 0)
 
-    // Soft, ambient-leaning lighting so the butterfly sits in the scene rather
-    // than being spotlit. Nothing bright enough to outshine the wallpaper.
     const hemi = new HemisphereLight(0xffffff, 0x3a3a44, 1.1)
     const key = new DirectionalLight(0xffffff, 1.2)
     key.position.set(2.5, 4, 3)
     const ambient = new AmbientLight(0xffffff, 0.25)
     this.scene.add(hemi, key, ambient)
 
-    // A neutral environment map (generated once) gives the PBR materials soft
-    // realistic reflections so the butterfly reads as part of the scene rather
-    // than a flat cut-out. One-time cost — not a per-frame post-process.
+    // Neutral environment (generated once) for soft realistic material response.
     const pmrem = new PMREMGenerator(this.renderer)
     this.envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
     this.scene.environment = this.envTexture
@@ -100,16 +106,12 @@ export class ButterflyController {
     document.addEventListener('visibilitychange', this.onVisibility)
   }
 
-  /** Load the model, then begin animating. Safe to call once. */
+  /** Load the model once and normalise it into a reusable, centred template. */
   async load(url: string): Promise<void> {
-    const loader = new GLTFLoader()
-    const gltf = await loader.loadAsync(url)
+    const gltf = await new GLTFLoader().loadAsync(url)
     if (this.disposed) return
 
     const model = gltf.scene
-
-    // Normalise: recenter to origin and rescale to the configured world size,
-    // rather than trusting the GLB's authored (×100) units.
     const box = new Box3().setFromObject(model)
     const size = box.getSize(new Vector3())
     const center = box.getCenter(new Vector3())
@@ -117,39 +119,85 @@ export class ButterflyController {
     model.position.sub(center)
     model.rotation.set(...this.cfg.modelOrientationOffset)
 
-    this.pivot = new Group()
-    this.pivot.add(model)
-    this.pivot.scale.setScalar(this.cfg.scale / maxDim)
-    this.scene.add(this.pivot)
+    this.baseModel = model
+    this.clips = gltf.animations
+    this.scaleFactor = this.cfg.scale / maxDim
+    this.loaded = true
+    this.reconcile()
+  }
 
-    // Collect materials for opacity fades; tame any excessive brightness.
+  /** Show exactly `n` butterflies (0..MAX_BUTTERFLIES). Safe before load. */
+  setCount(n: number): void {
+    this.desiredCount = Math.min(MAX_BUTTERFLIES, Math.max(0, Math.round(n)))
+    this.reconcile()
+    if (this.desiredCount > 0) this.start()
+    else this.stopAndClear()
+  }
+
+  private reconcile(): void {
+    if (!this.loaded || this.disposed) return
+    while (this.butterflies.length < this.desiredCount) this.addButterfly()
+    while (this.butterflies.length > this.desiredCount) this.removeButterfly()
+  }
+
+  private addButterfly(): void {
+    if (!this.baseModel) return
+    // SkeletonUtils.clone gives each butterfly its own skeleton so their wing
+    // animations are independent. Geometry stays shared (cheap); materials are
+    // cloned so each can fade with its own depth.
+    const model = cloneSkinned(this.baseModel)
+    const materials: Material[] = []
     model.traverse((obj: Object3D) => {
       const mesh = obj as Mesh
       if (!mesh.isMesh) return
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      for (const m of mats) {
-        if (!m) continue
-        m.transparent = true
-        m.opacity = 0
-        const std = m as Material & { envMapIntensity?: number }
+      const src = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      const cloned = src.map((m) => {
+        const cm = m.clone()
+        cm.transparent = true
+        cm.opacity = 0
+        const std = cm as Material & { envMapIntensity?: number }
         if (typeof std.envMapIntensity === 'number') std.envMapIntensity = this.cfg.envIntensity
-        this.materials.push(m)
-      }
+        materials.push(cm)
+        return cm
+      })
+      mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0]
     })
 
-    // Use a baked wing clip if present; otherwise the butterfly simply glides.
-    const clips = gltf.animations
-    if (clips.length > 0) {
-      const idx = Math.min(Math.max(this.cfg.wingClipIndex, 0), clips.length - 1)
-      this.wings = new WingController(model, clips[idx], this.cfg)
+    const pivot = new Group()
+    pivot.add(model)
+    pivot.scale.setScalar(this.scaleFactor)
+    this.scene.add(pivot)
+
+    let wings: WingController | null = null
+    if (this.clips.length > 0) {
+      const idx = Math.min(Math.max(this.cfg.wingClipIndex, 0), this.clips.length - 1)
+      wings = new WingController(model, this.clips[idx], this.cfg)
     }
+
+    this.butterflies.push({ pivot, flight: new FlightModel(this.cfg), wings, materials })
+  }
+
+  private removeButterfly(): void {
+    const b = this.butterflies.pop()
+    if (!b) return
+    b.wings?.dispose()
+    this.scene.remove(b.pivot)
+    // Only dispose the per-instance cloned materials; geometry is shared.
+    for (const m of b.materials) m.dispose()
   }
 
   start(): void {
-    if (this.running || this.disposed) return
+    if (this.running || this.disposed || this.desiredCount <= 0) return
     this.running = true
     this.clock.start()
     this.rafId = requestAnimationFrame(this.tick)
+  }
+
+  private stopAndClear(): void {
+    this.running = false
+    cancelAnimationFrame(this.rafId)
+    // Render the now-empty scene once so no frozen butterfly lingers.
+    if (!this.disposed) this.renderer.render(this.scene, this.camera)
   }
 
   private tick = (): void => {
@@ -158,7 +206,6 @@ export class ButterflyController {
     try {
       this.frame()
     } catch (err) {
-      // Never let a render error spin or crash the app — stop cleanly.
       this.running = false
       cancelAnimationFrame(this.rafId)
       console.error('Butterfly render stopped:', err)
@@ -166,32 +213,27 @@ export class ButterflyController {
   }
 
   private frame(): void {
-    // Clamp dt so a long pause (e.g. tab hidden) never causes a jump.
     const dt = Math.min(this.clock.getDelta(), 0.05)
 
-    this.flight.update(dt)
+    for (const b of this.butterflies) {
+      b.flight.update(dt)
+      const f = b.flight.forward
+      b.pivot.position.copy(b.flight.visualPosition)
 
-    if (this.pivot) {
-      const f = this.flight.forward
-      this.pivot.position.copy(this.flight.visualPosition)
-
-      // Aim along the velocity, bank (roll) into the turn, add a little pitch.
       this.q1.setFromUnitVectors(FORWARD, f)
-      this.qRoll.setFromAxisAngle(f, this.flight.roll)
-      this.pivot.quaternion.copy(this.qRoll).multiply(this.q1)
+      this.qRoll.setFromAxisAngle(f, b.flight.roll)
+      b.pivot.quaternion.copy(this.qRoll).multiply(this.q1)
       this.right.crossVectors(UP, f).normalize()
-      this.qPitch.setFromAxisAngle(this.right, -this.flight.pitch)
-      this.pivot.quaternion.premultiply(this.qPitch)
+      this.qPitch.setFromAxisAngle(this.right, -b.flight.pitch)
+      b.pivot.quaternion.premultiply(this.qPitch)
 
-      // Opacity: presence × subtle atmospheric fade with altitude (depth).
       const depthT = clamp01(
-        (this.flight.position.y - this.cfg.heightMin) / (this.cfg.heightMax - this.cfg.heightMin)
+        (b.flight.position.y - this.cfg.heightMin) / (this.cfg.heightMax - this.cfg.heightMin)
       )
-      const depthFade = 0.6 + 0.4 * depthT
-      const opacity = this.cfg.opacity * this.flight.presence * depthFade
-      for (const m of this.materials) m.opacity = opacity
+      const opacity = this.cfg.opacity * b.flight.presence * (0.6 + 0.4 * depthT)
+      for (const m of b.materials) m.opacity = opacity
 
-      this.wings?.update(dt, this.flight.speedNorm)
+      b.wings?.update(dt, b.flight.speedNorm)
     }
 
     this.renderer.render(this.scene, this.camera)
@@ -209,7 +251,7 @@ export class ButterflyController {
     if (document.hidden) {
       this.running = false
       cancelAnimationFrame(this.rafId)
-    } else if (!this.disposed) {
+    } else if (!this.disposed && this.desiredCount > 0) {
       this.start()
     }
   }
@@ -221,32 +263,18 @@ export class ButterflyController {
     window.removeEventListener('resize', this.resize)
     document.removeEventListener('visibilitychange', this.onVisibility)
 
-    this.wings?.dispose()
+    for (const b of this.butterflies) {
+      b.wings?.dispose()
+      for (const m of b.materials) m.dispose()
+    }
+    this.butterflies.length = 0
+
     this.envTexture?.dispose()
-    this.scene.traverse((obj: Object3D) => {
+    // Shared geometry lives on the base template — dispose it once.
+    this.baseModel?.traverse((obj: Object3D) => {
       const mesh = obj as Mesh
-      if (mesh.isMesh) {
-        mesh.geometry?.dispose()
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-        for (const m of mats) {
-          if (!m) continue
-          const withMaps = m as Material & Record<string, unknown>
-          for (const key of Object.keys(withMaps)) {
-            const value = withMaps[key] as Texture | undefined
-            if (value && (value as Texture).isTexture) value.dispose()
-          }
-          m.dispose()
-        }
-      }
+      if (mesh.isMesh) mesh.geometry?.dispose()
     })
-    // Note: no forceContextLoss() — it permanently kills the canvas's WebGL
-    // context, which breaks React StrictMode's dev re-mount (a new renderer on
-    // the same canvas would get a null/lost context). dispose() frees the GPU
-    // resources; the context is released with the canvas on real teardown.
     this.renderer.dispose()
   }
-}
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v
 }

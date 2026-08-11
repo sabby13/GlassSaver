@@ -4,10 +4,10 @@ import butterflyModel from '../assets/butterfly.glb'
 import './ButterflyLayer.css'
 
 /**
- * Additive foreground layer that hosts the 3D butterfly on its own transparent
- * canvas. The imperative controller owns the animation loop, so this component
- * mounts once and never re-renders per frame. Honours reduced-motion and the
- * config's `enabled` flag.
+ * Additive foreground layer hosting the 3D butterflies on a transparent canvas.
+ * The imperative controller owns the animation loop, so this mounts once and
+ * never re-renders per frame. The number of butterflies is driven by the
+ * persisted `butterflyCount` setting and updates live.
  */
 export function ButterflyLayer(): JSX.Element | null {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -22,18 +22,27 @@ export function ButterflyLayer(): JSX.Element | null {
 
     let cancelled = false
     let controller: ButterflyController | null = null
+    let unsubscribe: (() => void) | undefined
+
     try {
       controller = new ButterflyController(canvas, butterflyConfig)
-      controller
-        .load(butterflyModel)
-        .then(() => {
-          if (!cancelled) controller?.start()
+
+      // Apply the saved count, and load the model (which then builds them).
+      window.glass
+        .getSettings()
+        .then((s) => {
+          if (!cancelled) controller?.setCount(s.butterflyCount)
         })
-        .catch((err) => {
-          console.warn('Butterfly failed to load:', err)
+        .catch(() => {
+          /* leave at default */
         })
+      controller.load(butterflyModel).catch((err) => {
+        console.warn('Butterfly failed to load:', err)
+      })
+
+      // Live-update the count when it changes in Settings.
+      unsubscribe = window.glass.onSettingsChanged((s) => controller?.setCount(s.butterflyCount))
     } catch (err) {
-      // WebGL/init failure must never take down the clock. Fail silently.
       console.warn('Butterfly init failed:', err)
       controller?.dispose()
       controller = null
@@ -41,6 +50,7 @@ export function ButterflyLayer(): JSX.Element | null {
 
     return () => {
       cancelled = true
+      unsubscribe?.()
       controller?.dispose()
     }
   }, [])
