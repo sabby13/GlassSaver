@@ -56,10 +56,14 @@ export const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
 /** IPC channel names, kept in one place to avoid stringly-typed drift. */
 export const IPC = {
   getSettings: 'settings:get',
+  /** Synchronous read used once at load so the first paint has the right wallpaper. */
+  getSettingsSync: 'settings:get-sync',
   saveSettings: 'settings:save',
   selectBackgroundImage: 'settings:select-image',
   /** Main → renderer broadcast when settings change, for live updates. */
   settingsChanged: 'settings:changed',
+  /** Renderer → main: the wallpaper has decoded; the screensaver window may show. */
+  wallpaperReady: 'screensaver:wallpaper-ready',
   /** Renderer → main request to quit the whole app. */
   quit: 'app:quit'
 } as const

@@ -1,11 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type Settings } from '@shared/settings'
+import { DEFAULT_SETTINGS, IPC, type Settings } from '@shared/settings'
+
+// Read once, synchronously, before the page runs — so the first render already
+// knows the wallpaper and there is no default-then-swap flash.
+let initialSettings: Settings
+try {
+  initialSettings = (ipcRenderer.sendSync(IPC.getSettingsSync) as Settings) ?? DEFAULT_SETTINGS
+} catch {
+  initialSettings = DEFAULT_SETTINGS
+}
 
 /**
  * The single, typed surface the renderer is allowed to touch.
  * All filesystem and native-dialog work stays in the main process.
  */
 const api = {
+  /** The persisted settings, read synchronously at load. */
+  initialSettings,
+
   /** Read the persisted settings. */
   getSettings: (): Promise<Settings> => ipcRenderer.invoke(IPC.getSettings),
 
@@ -16,6 +28,9 @@ const api = {
   /** Open the native image picker; resolves to the chosen path, or null if cancelled. */
   selectBackgroundImage: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC.selectBackgroundImage),
+
+  /** Tell the main process the wallpaper has decoded so the window may show. */
+  notifyWallpaperReady: (): void => ipcRenderer.send(IPC.wallpaperReady),
 
   /** Quit the whole application. */
   quit: (): void => ipcRenderer.send(IPC.quit),

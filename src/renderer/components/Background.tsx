@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import { DEFAULT_WALLPAPER_URL, resolveWallpaperUrl } from '../lib/wallpapers'
 import './Background.css'
@@ -6,33 +6,32 @@ import './Background.css'
 /**
  * The single component responsible for displaying the wallpaper.
  *
- * On mount it reads the persisted setting and shows the resolved wallpaper —
- * a built-in JPG (`builtin:<id>`) or the user's custom image served through the
- * glass-asset protocol. If the image can't load (e.g. a moved custom file), it
- * falls back to the built-in default. The renderer never touches the filesystem.
+ * The saved setting is read synchronously at load (via the preload bridge), so
+ * the very first render already targets the correct wallpaper — no default-then
+ * -swap flash. Once the image decodes it notifies the main process, which then
+ * reveals the (previously hidden) window, so the first visible frame is the
+ * right image. A built-in JPG or the user's custom image (served through the
+ * glass-asset protocol) both work; the renderer never touches the filesystem.
  */
 export function Background(): JSX.Element {
-  const [src, setSrc] = useState<string>(() =>
-    resolveWallpaperUrl(DEFAULT_SETTINGS.backgroundImage)
-  )
+  const initial = window.glass?.initialSettings ?? DEFAULT_SETTINGS
+  const [src, setSrc] = useState<string>(() => resolveWallpaperUrl(initial.backgroundImage))
+  const notified = useRef(false)
 
   useEffect(() => {
     let active = true
-
     const apply = (backgroundImage: string): void => {
-      setSrc(resolveWallpaperUrl(backgroundImage))
+      if (active) setSrc(resolveWallpaperUrl(backgroundImage))
     }
 
+    // Correct against the authoritative value (covers a rare sync-read miss),
+    // then track live changes from the Settings window.
     window.glass
       .getSettings()
-      .then((settings) => {
-        if (active) apply(settings.backgroundImage)
-      })
+      .then((settings) => apply(settings.backgroundImage))
       .catch(() => {
-        if (active) apply(DEFAULT_SETTINGS.backgroundImage)
+        /* keep the synchronous initial value */
       })
-
-    // Swap the wallpaper live when it is changed in the Settings window.
     const off = window.glass.onSettingsChanged((settings) => apply(settings.backgroundImage))
     return () => {
       active = false
@@ -40,8 +39,16 @@ export function Background(): JSX.Element {
     }
   }, [])
 
+  const signalReady = (): void => {
+    if (notified.current) return
+    notified.current = true
+    window.glass?.notifyWallpaperReady?.()
+  }
+
   const handleError = (): void => {
     if (src !== DEFAULT_WALLPAPER_URL) setSrc(DEFAULT_WALLPAPER_URL)
+    // Still reveal the window even if the image failed, so it never stays hidden.
+    signalReady()
   }
 
   return (
@@ -51,6 +58,7 @@ export function Background(): JSX.Element {
         src={src}
         alt=""
         draggable={false}
+        onLoad={signalReady}
         onError={handleError}
       />
     </div>

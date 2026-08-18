@@ -12,6 +12,12 @@ import { getSettings, saveSettings } from '../storage/settingsStore'
 export function registerSettingsIpc(): void {
   ipcMain.handle(IPC.getSettings, (): Settings => getSettings())
 
+  // Synchronous read so the renderer's first paint already has the right
+  // wallpaper (no default-then-swap flash on startup).
+  ipcMain.on(IPC.getSettingsSync, (event) => {
+    event.returnValue = getSettings()
+  })
+
   ipcMain.handle(IPC.saveSettings, (_event, update: Partial<Settings>): Settings => {
     const saved = saveSettings(update)
     // Broadcast to every window so the live screensaver reflects changes at once.
