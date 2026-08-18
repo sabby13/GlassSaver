@@ -5,7 +5,11 @@
  */
 
 export interface Settings {
-  /** Absolute path to the user's chosen background image ("" = none). */
+  /**
+   * The active wallpaper. Either a built-in reference of the form
+   * `builtin:<id>` (see BUILTIN_WALLPAPER_IDS) or an absolute path to a
+   * user-provided image.
+   */
   backgroundImage: string
   /** Show a 24-hour clock when true, 12-hour when false. */
   use24Hour: boolean
@@ -18,8 +22,29 @@ export interface Settings {
 /** Maximum number of butterflies the screensaver will render. */
 export const MAX_BUTTERFLIES = 3
 
+/** The wallpapers shipped with GlassButterfly, in display order. */
+export const BUILTIN_WALLPAPER_IDS = ['rome', 'uwu', 'her'] as const
+export type BuiltinWallpaperId = (typeof BUILTIN_WALLPAPER_IDS)[number]
+
+const BUILTIN_PREFIX = 'builtin:'
+
+/** Build a settings value referencing a built-in wallpaper, e.g. "builtin:rome". */
+export function builtinWallpaper(id: BuiltinWallpaperId): string {
+  return `${BUILTIN_PREFIX}${id}`
+}
+
+/** True if a backgroundImage value refers to a built-in wallpaper. */
+export function isBuiltinWallpaper(value: string): boolean {
+  return value.startsWith(BUILTIN_PREFIX)
+}
+
+/** The built-in id from a "builtin:<id>" value (unchecked; renderer validates). */
+export function builtinWallpaperId(value: string): string {
+  return value.slice(BUILTIN_PREFIX.length)
+}
+
 export const DEFAULT_SETTINGS: Settings = {
-  backgroundImage: '',
+  backgroundImage: builtinWallpaper('rome'),
   use24Hour: true,
   showSeconds: false,
   butterflyCount: 1

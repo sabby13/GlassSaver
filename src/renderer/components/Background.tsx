@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
-import { toAssetUrl } from '../lib/assetUrl'
-import defaultWallpaper from '../assets/default-wallpaper.svg'
+import { DEFAULT_SETTINGS } from '@shared/settings'
+import { DEFAULT_WALLPAPER_URL, resolveWallpaperUrl } from '../lib/wallpapers'
 import './Background.css'
 
 /**
  * The single component responsible for displaying the wallpaper.
  *
- * On mount it reads the persisted settings and shows the saved image. If no
- * image is set — or the file can no longer be loaded — it falls back to the
- * bundled default wallpaper. The `<img onError>` fallback covers a deleted or
- * moved file without the renderer ever touching the filesystem.
+ * On mount it reads the persisted setting and shows the resolved wallpaper —
+ * a built-in JPG (`builtin:<id>`) or the user's custom image served through the
+ * glass-asset protocol. If the image can't load (e.g. a moved custom file), it
+ * falls back to the built-in default. The renderer never touches the filesystem.
  */
 export function Background(): JSX.Element {
-  const [src, setSrc] = useState<string>(defaultWallpaper)
+  const [src, setSrc] = useState<string>(() =>
+    resolveWallpaperUrl(DEFAULT_SETTINGS.backgroundImage)
+  )
 
   useEffect(() => {
     let active = true
 
     const apply = (backgroundImage: string): void => {
-      setSrc(backgroundImage ? toAssetUrl(backgroundImage) : defaultWallpaper)
+      setSrc(resolveWallpaperUrl(backgroundImage))
     }
 
     window.glass
@@ -27,7 +29,7 @@ export function Background(): JSX.Element {
         if (active) apply(settings.backgroundImage)
       })
       .catch(() => {
-        if (active) setSrc(defaultWallpaper)
+        if (active) apply(DEFAULT_SETTINGS.backgroundImage)
       })
 
     // Swap the wallpaper live when it is changed in the Settings window.
@@ -39,7 +41,7 @@ export function Background(): JSX.Element {
   }, [])
 
   const handleError = (): void => {
-    if (src !== defaultWallpaper) setSrc(defaultWallpaper)
+    if (src !== DEFAULT_WALLPAPER_URL) setSrc(DEFAULT_WALLPAPER_URL)
   }
 
   return (

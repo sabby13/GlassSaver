@@ -113,6 +113,33 @@ body {
   margin-left: 14px;
 }
 
+/* Built-in wallpaper thumbnails. */
+.wallpaper-thumbs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.thumb {
+  flex: 1;
+  height: 44px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease;
+}
+
+.thumb:hover {
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.3));
+}
+
+.thumb--on {
+  border-color: var(--accent);
+}
+
 /* Buttons. */
 .btn {
   appearance: none;

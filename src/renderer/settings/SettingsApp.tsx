@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_SETTINGS, MAX_BUTTERFLIES, type Settings } from '@shared/settings'
-import { toAssetUrl } from '../lib/assetUrl'
-import defaultWallpaper from '../assets/default-wallpaper.svg'
+import {
+  builtinWallpaper,
+  builtinWallpaperId,
+  DEFAULT_SETTINGS,
+  isBuiltinWallpaper,
+  MAX_BUTTERFLIES,
+  type Settings
+} from '@shared/settings'
+import {
+  BUILTIN_WALLPAPERS,
+  DEFAULT_WALLPAPER_URL,
+  resolveWallpaperUrl
+} from '../lib/wallpapers'
 import { Toggle } from './Toggle'
 import './settings.css'
 
@@ -46,8 +56,13 @@ export function SettingsApp(): JSX.Element {
     }
   }
 
-  const hasImage = settings.backgroundImage !== ''
-  const previewSrc = hasImage ? toAssetUrl(settings.backgroundImage) : defaultWallpaper
+  const bg = settings.backgroundImage
+  const isBuiltin = isBuiltinWallpaper(bg)
+  const activeBuiltinId = isBuiltin ? builtinWallpaperId(bg) : null
+  const previewSrc = resolveWallpaperUrl(bg)
+  const currentLabel = isBuiltin
+    ? (BUILTIN_WALLPAPERS.find((w) => w.id === activeBuiltinId)?.label ?? 'Built-in')
+    : basename(bg)
   const counts = Array.from({ length: MAX_BUTTERFLIES + 1 }, (_, i) => i)
 
   return (
@@ -63,27 +78,32 @@ export function SettingsApp(): JSX.Element {
             src={previewSrc}
             alt=""
             onError={(event) => {
-              event.currentTarget.src = defaultWallpaper
+              event.currentTarget.src = DEFAULT_WALLPAPER_URL
             }}
           />
         </div>
         <div className="card__row">
           <div className="card__text">
             <span className="card__label">Background</span>
-            <span className="card__hint">
-              {hasImage ? basename(settings.backgroundImage) : 'Default wallpaper'}
-            </span>
+            <span className="card__hint">{currentLabel}</span>
           </div>
-          <div className="card__actions">
-            <button className="btn" onClick={chooseImage} disabled={picking}>
-              {picking ? 'Choosing…' : 'Choose image…'}
-            </button>
-            {hasImage && (
-              <button className="btn btn--ghost" onClick={() => update({ backgroundImage: '' })}>
-                Use default
-              </button>
-            )}
-          </div>
+          <button className="btn" onClick={chooseImage} disabled={picking}>
+            {picking ? 'Choosing…' : 'Choose image…'}
+          </button>
+        </div>
+        <div className="card__divider" />
+        <div className="wallpaper-thumbs" role="group" aria-label="Built-in wallpapers">
+          {BUILTIN_WALLPAPERS.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              className={activeBuiltinId === w.id ? 'thumb thumb--on' : 'thumb'}
+              style={{ backgroundImage: `url(${w.url})` }}
+              aria-label={w.label}
+              aria-pressed={activeBuiltinId === w.id}
+              onClick={() => update({ backgroundImage: builtinWallpaper(w.id) })}
+            />
+          ))}
         </div>
       </section>
 

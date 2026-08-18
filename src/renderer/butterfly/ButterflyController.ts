@@ -239,6 +239,10 @@ export class ButterflyController {
           const d = Math.hypot(dx, dz)
           if (d < rad) targetSep += (i < k ? 1 : -1) * this.cfg.separationLift * (1 - d / rad)
         }
+        // Bound the lift so three in one spot can't fling far apart in altitude.
+        const maxSep = this.cfg.separationLift * 1.6
+        if (targetSep > maxSep) targetSep = maxSep
+        else if (targetSep < -maxSep) targetSep = -maxSep
         list[i].sepY += (targetSep - list[i].sepY) * damp
       }
     } else if (n === 1) {
@@ -301,11 +305,40 @@ export class ButterflyController {
     this.butterflies.length = 0
 
     this.envTexture?.dispose()
-    // Shared geometry lives on the base template — dispose it once.
+    // Shared geometry and textures live on the base template — free them once.
     this.baseModel?.traverse((obj: Object3D) => {
       const mesh = obj as Mesh
-      if (mesh.isMesh) mesh.geometry?.dispose()
+      if (!mesh.isMesh) return
+      mesh.geometry?.dispose()
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const m of mats) {
+        if (!m) continue
+        disposeMaterialTextures(m)
+        m.dispose()
+      }
     })
+    this.baseModel = null
     this.renderer.dispose()
+  }
+}
+
+/** Texture map slots a butterfly material may hold; freed once at teardown. */
+const TEXTURE_KEYS = [
+  'map',
+  'normalMap',
+  'roughnessMap',
+  'metalnessMap',
+  'aoMap',
+  'emissiveMap',
+  'bumpMap',
+  'alphaMap',
+  'specularMap'
+] as const
+
+function disposeMaterialTextures(material: Material): void {
+  const rec = material as unknown as Record<string, unknown>
+  for (const key of TEXTURE_KEYS) {
+    const tex = rec[key]
+    if (tex && (tex as Texture).isTexture) (tex as Texture).dispose()
   }
 }
