@@ -14,4 +14,17 @@
   display: block;
   user-select: none;
   -webkit-user-drag: none;
+  /* Fade up from black once the image has decoded. */
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.background__image--loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background__image {
+    transition: none;
+  }
 }

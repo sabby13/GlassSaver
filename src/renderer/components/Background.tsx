@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import { DEFAULT_WALLPAPER_URL, resolveWallpaperUrl } from '../lib/wallpapers'
 import './Background.css'
@@ -7,16 +7,16 @@ import './Background.css'
  * The single component responsible for displaying the wallpaper.
  *
  * The saved setting is read synchronously at load (via the preload bridge), so
- * the very first render already targets the correct wallpaper — no default-then
- * -swap flash. Once the image decodes it notifies the main process, which then
- * reveals the (previously hidden) window, so the first visible frame is the
- * right image. A built-in JPG or the user's custom image (served through the
- * glass-asset protocol) both work; the renderer never touches the filesystem.
+ * the first render already targets the correct wallpaper — no default-then-swap
+ * flash. The image fades up from black once it decodes, so the brief pre-decode
+ * moment reads as an intentional dissolve rather than a black flash. A built-in
+ * JPG or the user's custom image (served through the glass-asset protocol) both
+ * work; the renderer never touches the filesystem.
  */
 export function Background(): JSX.Element {
   const initial = window.glass?.initialSettings ?? DEFAULT_SETTINGS
   const [src, setSrc] = useState<string>(() => resolveWallpaperUrl(initial.backgroundImage))
-  const notified = useRef(false)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -39,26 +39,18 @@ export function Background(): JSX.Element {
     }
   }, [])
 
-  const signalReady = (): void => {
-    if (notified.current) return
-    notified.current = true
-    window.glass?.notifyWallpaperReady?.()
-  }
-
   const handleError = (): void => {
     if (src !== DEFAULT_WALLPAPER_URL) setSrc(DEFAULT_WALLPAPER_URL)
-    // Still reveal the window even if the image failed, so it never stays hidden.
-    signalReady()
   }
 
   return (
     <div className="background">
       <img
-        className="background__image"
+        className={loaded ? 'background__image background__image--loaded' : 'background__image'}
         src={src}
         alt=""
         draggable={false}
-        onLoad={signalReady}
+        onLoad={() => setLoaded(true)}
         onError={handleError}
       />
     </div>

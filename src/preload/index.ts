@@ -29,9 +29,6 @@ const api = {
   selectBackgroundImage: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC.selectBackgroundImage),
 
-  /** Tell the main process the wallpaper has decoded so the window may show. */
-  notifyWallpaperReady: (): void => ipcRenderer.send(IPC.wallpaperReady),
-
   /** Quit the whole application. */
   quit: (): void => ipcRenderer.send(IPC.quit),
 

@@ -1,6 +1,5 @@
 import { resolve } from 'node:path'
-import { BrowserWindow, ipcMain, screen } from 'electron'
-import { IPC } from '@shared/settings'
+import { BrowserWindow, screen } from 'electron'
 
 const isDev = !!process.env['ELECTRON_RENDERER_URL']
 
@@ -37,20 +36,8 @@ export function createScreensaverWindow(): BrowserWindow {
     }
   })
 
-  // Show only once the wallpaper has decoded, so the first visible frame is
-  // already the correct image — no black/default flash. A timeout is a safety
-  // net in case the renderer never signals (e.g. an asset error).
-  let shown = false
-  const reveal = (): void => {
-    if (shown) return
-    shown = true
-    if (screensaverWindow && !screensaverWindow.isDestroyed()) screensaverWindow.show()
-  }
-  ipcMain.once(IPC.wallpaperReady, reveal)
-  screensaverWindow.once('ready-to-show', () => setTimeout(reveal, 2000))
-
+  screensaverWindow.once('ready-to-show', () => screensaverWindow?.show())
   screensaverWindow.on('closed', () => {
-    ipcMain.removeListener(IPC.wallpaperReady, reveal)
     screensaverWindow = null
   })
 
