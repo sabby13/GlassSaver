@@ -33,6 +33,6 @@ const api = {
   }
 }
 
-export type GlassSaverApi = typeof api
+export type GlassButterflyApi = typeof api
 
 contextBridge.exposeInMainWorld('glass', api)

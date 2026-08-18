@@ -1,4 +1,4 @@
-# GlassSaver
+# GlassButterfly
 
 A minimal, beautiful liquid-glass clock screensaver. Pick a background, and a
 frosted-glass clock and date float over it. Offline, lightweight, native-feeling.

@@ -1,5 +1,5 @@
 {
-  "name": "glasssaver",
+  "name": "glassbutterfly",
   "version": "1.0.0",
   "description": "A minimal, beautiful liquid-glass clock screensaver.",
   "author": "sahib",
@@ -29,8 +29,8 @@
     "vite": "^5.4.0"
   },
   "build": {
-    "appId": "com.sahib.glasssaver",
-    "productName": "GlassSaver",
+    "appId": "com.sahib.glassbutterfly",
+    "productName": "GlassButterfly",
     "compression": "maximum",
     "files": [
       "out/**/*"

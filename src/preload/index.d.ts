@@ -1,8 +1,8 @@
-import type { GlassSaverApi } from './index'
+import type { GlassButterflyApi } from './index'
 
 declare global {
   interface Window {
-    glass: GlassSaverApi
+    glass: GlassButterflyApi
   }
 }
 

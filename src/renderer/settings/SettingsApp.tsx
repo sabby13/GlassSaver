@@ -53,7 +53,7 @@ export function SettingsApp(): JSX.Element {
   return (
     <div className="settings">
       <header className="settings__header">
-        <h1 className="settings__title">GlassSaver</h1>
+        <h1 className="settings__title">GlassButterfly</h1>
         <p className="settings__subtitle">Settings</p>
       </header>
 
@@ -136,7 +136,7 @@ export function SettingsApp(): JSX.Element {
 
       <footer className="settings__footer">
         <button className="btn btn--danger" onClick={() => window.glass.quit()}>
-          Exit GlassSaver
+          Exit GlassButterfly
         </button>
       </footer>
     </div>

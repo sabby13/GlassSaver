@@ -57,7 +57,7 @@ export function createSettingsWindow(): BrowserWindow {
     resizable: false,
     fullscreenable: false,
     maximizable: false,
-    title: 'GlassSaver Settings',
+    title: 'GlassButterfly Settings',
     backgroundColor: '#1c1c1e',
     show: false,
     webPreferences: {
