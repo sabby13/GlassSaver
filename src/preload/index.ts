@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { GlassApi } from '@shared/api'
 import { DEFAULT_SETTINGS, IPC, type Settings } from '@shared/settings'
 
 // Read once, synchronously, before the page runs — so the first render already
@@ -14,7 +15,7 @@ try {
  * The single, typed surface the renderer is allowed to touch.
  * All filesystem and native-dialog work stays in the main process.
  */
-const api = {
+const api: GlassApi = {
   /** The persisted settings, read synchronously at load. */
   initialSettings,
 
@@ -44,7 +45,5 @@ const api = {
     }
   }
 }
-
-export type GlassButterflyApi = typeof api
 
 contextBridge.exposeInMainWorld('glass', api)
