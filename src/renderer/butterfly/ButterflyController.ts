@@ -33,6 +33,8 @@ interface Butterfly {
   flight: FlightModel
   wings: WingController | null
   materials: Material[]
+  /** Smoothed altitude offset that lifts this one apart from close neighbours. */
+  sepY: number
 }
 
 /**
@@ -62,6 +64,7 @@ export class ButterflyController {
   private readonly qRoll = new Quaternion()
   private readonly qPitch = new Quaternion()
   private readonly right = new Vector3()
+  private readonly tmpPos = new Vector3()
 
   private rafId = 0
   private running = false
@@ -174,7 +177,7 @@ export class ButterflyController {
       wings = new WingController(model, this.clips[idx], this.cfg)
     }
 
-    this.butterflies.push({ pivot, flight: new FlightModel(this.cfg), wings, materials })
+    this.butterflies.push({ pivot, flight: new FlightModel(this.cfg), wings, materials, sepY: 0 })
   }
 
   private removeButterfly(): void {
@@ -214,11 +217,39 @@ export class ButterflyController {
 
   private frame(): void {
     const dt = Math.min(this.clock.getDelta(), 0.05)
+    const list = this.butterflies
+    const n = list.length
 
-    for (const b of this.butterflies) {
-      b.flight.update(dt)
+    for (const b of list) b.flight.update(dt)
+
+    // Depth separation: when two butterflies are close on the plane, ease their
+    // altitudes apart (lower index rises, higher index sinks) so one clearly
+    // flies above the other instead of their bodies intersecting.
+    if (n > 1) {
+      const rad = this.cfg.separationRadius
+      const damp = 1 - Math.exp(-3 * dt)
+      for (let i = 0; i < n; i++) {
+        const pi = list[i].flight.position
+        let targetSep = 0
+        for (let k = 0; k < n; k++) {
+          if (k === i) continue
+          const pk = list[k].flight.position
+          const dx = pi.x - pk.x
+          const dz = pi.z - pk.z
+          const d = Math.hypot(dx, dz)
+          if (d < rad) targetSep += (i < k ? 1 : -1) * this.cfg.separationLift * (1 - d / rad)
+        }
+        list[i].sepY += (targetSep - list[i].sepY) * damp
+      }
+    } else if (n === 1) {
+      list[0].sepY = 0
+    }
+
+    for (const b of list) {
       const f = b.flight.forward
-      b.pivot.position.copy(b.flight.visualPosition)
+      this.tmpPos.copy(b.flight.visualPosition)
+      this.tmpPos.y += b.sepY
+      b.pivot.position.copy(this.tmpPos)
 
       this.q1.setFromUnitVectors(FORWARD, f)
       this.qRoll.setFromAxisAngle(f, b.flight.roll)

@@ -52,6 +52,12 @@ export interface ButterflyConfig {
   keepoutX: number
   keepoutY: number
 
+  // --- Multiple butterflies ---
+  /** When two butterflies are closer than this on the plane, they lift apart. */
+  separationRadius: number
+  /** How much they lift in altitude so one clearly passes above the other. */
+  separationLift: number
+
   // --- Wings ---
   wingSpeed: number
   /** How much the wing stroke opens/relaxes during glides (0..1). */
@@ -97,6 +103,9 @@ export const butterflyConfig: ButterflyConfig = {
 
   keepoutX: 1.7,
   keepoutY: 0.9,
+
+  separationRadius: 1.7,
+  separationLift: 0.8,
 
   wingSpeed: 1.7,
   wingAmplitude: 0.2,
